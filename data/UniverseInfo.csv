@@ -1,0 +1,43 @@
+Ticker,Name,Asset Class,Universe,Factor,Exposure,GRID
+VONG,Russell 1000 Growth,Equities,Large Cap,Growth,Large,Goldilocks
+AGG,U.S. Aggregate Bond,Fixed Income,U.S. - Broad Market,Investment Grade,All-Term,Deflation
+BTU,Peabody Energy Corporation,Equities,Energy,Energy,Small,Reflation
+COF,Capital One,Equities,Financials,Financials,Large,Reflation
+DEF,Defensive Equity,Equities,Large Cap,Defensive,Large,Deflation
+EUSA,USA Equal Weighted,Equities,U.S. - Total Market,Cyclicals,Multi,Reflation
+EZU,Eurozone,Equities,Developed Europe,Vanilla,Large,Goldilocks
+HYG,High Yield Corporate Bond,Fixed Income,U.S. - Corporate,High Yield,Intermediate-Term,Goldilocks
+IWM,Russell 2000,Equities,Small Cap,Vanilla,Small,Goldilocks
+JNK,High Yield Bond,Fixed Income,U.S. - Corporate,High Yield,Intermediate-Term,Goldilocks
+JPM,JPMorgan Chase & Co,Equities,Financials,Financials,Large,Reflation
+RSP,S&P 500® Equal Weight,Equities,Large Cap,Cyclicals,Multi,Reflation
+SPHB,S&P 500® High Beta,Equities,Large Cap,High Beta,Large,Reflation
+SPY,S&P 500,Equities,Large Cap,Vanilla,Large,Goldilocks
+TIP,TIPS Bond,Fixed Income,5-10 Yr TIPS,Broad Maturities,All-Term,Inflation
+TLT,20+ Year Treasury Bond,Fixed Income,Treasuries,Duration,Long-Term,Inflation
+UNG,United States Natural Gas,Commodities,Commodities,Energy,Futures-Based,Reflation
+URNM,Global Uranium Mining,Commodities,Commodities,Energy,Multi,Reflation
+USO,United States Oil,Commodities,Commodities,Energy,Futures-Based,Reflation
+VTI,Total Stock Market,Equities,U.S. - Total Market,Vanilla,Large,Reflation
+XLF,Financials,Equities,Financials,Financials,Large,Reflation
+ETHE,Ethereum Trust,Commodities,Crypto,Crypto,Crypto,Inflation
+GBTC,Bitcoin Trust,Commodities,Crypto,Crypto,Crypto,Inflation
+GOOGL,Google,Equities,Technology,Technology,Mega,Deflation
+MGK,Mega Cap Growth,Equities,Large Cap,Growth,Large,Deflation
+BNO,United States Brent Oil,Commodities,Commodities,Energy,Futures-Based,Reflation
+UGA,United States Gasoline,Commodities,Commodities,Energy,Futures-Based,Inflation
+VOE,Mid-Cap Value,Equities,Mid Cap,Value,Mid,Reflation
+VOT,Mid-Cap Growth,Equities,Mid Cap,Growth,Mid,Reflation
+VIOV,S&P Small-Cap 600 Value,Equities,Small Cap,Value,Small,Reflation
+VBK,Small Cap Growth,Equities,Small Cap,Growth,Small,Reflation
+EDV,Extended Duration Treasury,Fixed Income,Treasuries,Duration,Long-Term,Inflation
+QQQ,Nasdaq,Equities,Large Cap,Vanilla,Large,Goldilocks
+IVOL,Interest Rate Volatility & Inflation Hedge,Fixed Income,Treasuries,Active,All-Term,Reflation
+IWN,Russell 2000 Value,Equities,Small Cap,Value,Small,Reflation
+CPER,Copper,Commodities,Commodities,Materials,Futures-Based,Inflation
+URA,Global X Uranium,Commodities,Commodities,Energy,Multi,Reflation
+INDA,India,Equities,India,Vanilla,Large,Reflation
+THD,Thailand,Equities,Thailand,Vanilla,Large,Reflation
+DBB,Base Metals,Commodities,Commodities,Materials,Futures-Based,Reflation
+XLE,Energy,Equities,Energy,Energy,Large,Reflation
+XOP,Oil & Gas,Equities,Energy,Energy,Multi,Reflation

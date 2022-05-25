@@ -1,0 +1,15 @@
+data/*
+!data/UniverseInfo.csv
+
+portfolios/*
+!portfolios/Portfolio.Sample.csv
+!portfolios/MarketSnapshot.csv
+!portfolios/Potentials.csv
+
+mfr/*
+!mfr/2022-05-23.Sample.csv
+
+apiKeys.py
+
+__pycache__/
+.spyproject/

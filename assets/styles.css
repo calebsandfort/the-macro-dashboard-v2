@@ -1,0 +1,33 @@
+.card-header-font{
+    font-size: 1.7rem;
+}
+
+#main_tabs .nav-item{
+    font-size: 1.7rem;
+}
+
+@media (min-width: 2000px) {
+    .modal-xl {
+        max-width:2440px
+    }
+}
+
+#asset-modal-header{
+    justify-content: center;
+}
+
+#eth-btc-comparison-modal text[style*="font-size: 9px"] {
+    font-size: 0 !important;
+}
+
+.white_table,
+.white_table th,
+.white_table td{
+  border: 1px solid #bbbbbb;
+}
+
+.compact_table,
+.compact_table th,
+.compact_table td{
+  padding: .35rem;
+}
