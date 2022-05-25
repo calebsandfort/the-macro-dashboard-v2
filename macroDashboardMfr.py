@@ -6,22 +6,16 @@ Created on Wed Jan 12 16:57:19 2022
 """
 import dash
 from dash import dash_table, ALL
-from dash_table import DataTable, FormatTemplate
-from dash_table.Format import Format, Scheme, Sign, Symbol
+from dash_table import DataTable
 from dash import dcc
 from dash import html
 import dash_bootstrap_components as dbc
-import plotly.express as px
 import pandas as pd
-import datetime
 from dash.dependencies import Input, Output, State
-import dataRetrieval as dr
 import portfolioUtilities as portUtils
 import json
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import plotly.express as px
-import constants
 import assetClassesMfr as ac
 from scipy.stats import pearsonr
 import numpy as np
