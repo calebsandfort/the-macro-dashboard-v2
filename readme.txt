@@ -45,3 +45,11 @@ Usage
 2. Optional flags
     a. "-r" => this will download up to date data for your tickers => "python macroDashboardMfr.py -r"
     b. "-d" => this will run the project in debug mode. Useful if you are coding => "python macroDashboardMfr.py -d"
+    
+    
+Useful links
+- https://dash-bootstrap-components.opensource.faculty.ai/docs/
+- https://plotly.com/python/reference/
+- https://plotly.com/python/
+- https://www.anaconda.com/
+- https://dash.plotly.com/
