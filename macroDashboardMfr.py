@@ -23,7 +23,11 @@ import argparse
 import helper
 
 parser = argparse.ArgumentParser()
+
 parser.add_argument("-r", "--refresh", help="refresh data",
+                    action="store_true")
+
+parser.add_argument("-d", "--debug", help="debug",
                     action="store_true")
 
 args = parser.parse_args()
@@ -946,7 +950,7 @@ def getAssetCrowdingChart(asset):
         layout_fig = go.Figure(layout=layout)
         
         # subplot_titles = (f"{asset.ticker} - {asset.price_data.index.values[-1]}")
-        subplot_titles = (f"{asset.ticker}")
+        # subplot_titles = (f"{asset.ticker}")
 
         fig = make_subplots(rows=1, cols=1, row_heights = [1.0], figure = layout_fig,
                             # subplot_titles=subplot_titles,
@@ -990,7 +994,7 @@ def getAssetCrowdingChart(asset):
         for i in range(lookback):
             marker_sizes.append(5 + (i * 2))
         
-        marker_sizes = [ele for ele in reversed(marker_sizes)]
+        iv_colors = [ele for ele in reversed(iv_colors)]
         
         fig.add_trace(go.Scatter(x = x_list, y = y_list,
                                  mode='markers+lines',
@@ -1019,8 +1023,8 @@ def getAssetCrowdingChart(asset):
             "title": "Skew Z-Score",
             "tickfont": {
                 "size": 14
-                }
-            # "ticklabelstep": 2
+                },
+            "ticklabelstep": 2
             }, row=1, col=1)
         
         fig.update_yaxes({
@@ -1371,4 +1375,4 @@ def update_asset_modal(portfolio_assets_data_table_active_cell, watchlist_assets
     return content, f"{ticker} - Chart and Technicals", renderModal
 
 if __name__ == '__main__':
-    app.run_server(debug=(not args.refresh), port='5435')
+    app.run_server(debug=(args.debug), port='5435')
