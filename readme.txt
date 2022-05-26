@@ -42,6 +42,7 @@ Usage
     a. Navigate to project folder: cd "<path to folder>"
     b. Run command "python macroDashboardMfr.py" to run project ****You'll want to do step 2a the first time you rune the project
     c. Once command prompt prints "done" hit "http://127.0.0.1:5435/"
+    d. Clicking a ticker will pop open the info dialog for the corresponding asset.
 2. Optional flags
     a. "-r" => this will download up to date data for your tickers => "python macroDashboardMfr.py -r"
     b. "-d" => this will run the project in debug mode. Useful if you are coding => "python macroDashboardMfr.py -d"
