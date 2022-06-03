@@ -135,8 +135,7 @@ def get_assets_data_table(name, assetCollection):
          format={"specifier": ".2%"}),
     dict(id='Chg3M', name='3M', type='numeric',
          format={"specifier": ".2%"}),
-    # dict(id='CATS', name='CATS', type='numeric',
-    #      format={"specifier": ".2f"}),
+    dict(id='Crowding_Text', name='Crowding', type='numeric'),
     ])
 
 
@@ -270,6 +269,38 @@ def get_assets_data_table(name, assetCollection):
             },
             'backgroundColor': "#00441B",
             'color': 'white'
+        },
+        {
+            'if': {
+                'filter_query': '{Crowding_Text} = "Squeeze"',
+                'column_id': 'Crowding_Text'
+            },
+            'backgroundColor': "#00441B",
+            'color': 'white'
+        },
+        {
+            'if': {
+                'filter_query': '{Crowding_Text} = "Trim Longs"',
+                'column_id': 'Crowding_Text'
+            },
+            'backgroundColor': "#73C476",
+            'color': '#272727'
+        },
+        {
+            'if': {
+                'filter_query': '{Crowding_Text} = "Correction"',
+                'column_id': 'Crowding_Text'
+            },
+            'backgroundColor': "#67000D",
+            'color': 'white'
+        },
+        {
+            'if': {
+                'filter_query': '{Crowding_Text} = "Trim Shorts"',
+                'column_id': 'Crowding_Text'
+            },
+            'backgroundColor': "#FB6B4B",
+            'color': '#272727'
         }])
     
     styles.extend(portUtils.get_column_cmap_values(assetCollection.df, 'RPos', 0.0, 1.0, cmap='RdYlGn', reverse=False, low=0, high=0,
@@ -282,7 +313,7 @@ def get_assets_data_table(name, assetCollection):
         'if': {
             'filter_query': '{Ticker} = "Cash"',
             'column_id': ["PnL", "Chg1D", "Chg1M", "Chg3M", "TrendEmoji", "MomentumEmoji", "RPos", "VolumeDesc", "LR", "TR", "Last",
-                          # "CATS"
+                           "Crowding_Score", "Crowding_Text"
                           ]
         },
         'color': 'transparent',
@@ -499,6 +530,25 @@ def addDownVolume(fig, df, name, enumValue, row, col):
                 width = 86400000,
                 marker_color= volume_colors),
                   row=row, col=col)
+    
+def addCrowding(fig, df, name, row, col):
+    crowding = df.loc[(df["crowding_text"] == name)]
+    
+    crowding_colors = {
+        "Squeeze": "#00441B",
+        "Trim Longs": "#73C476",
+        "Trim Shorts": "#67000D",
+        "Correction": "#FB6B4B"
+        }
+
+    fig.add_trace(go.Bar(x=crowding.index.values, y=crowding["crowding_score"],
+                showlegend=True,
+                name=name,
+                legendgroup="Crowding",
+                legendgrouptitle_text="Crowding",
+                width = 86400000,
+                marker_color= crowding_colors[name]),
+                  row=row, col=col)
 
 def drawCandlestickChart(fig, df, isPercent, row, col, showLegend = True):
     fig.update_yaxes({
@@ -682,15 +732,10 @@ def getCharts(asset, lookback):
     
     noVolume = asset.ticker in ac.noVolumeTickers
     
-    # row_count = 3 if noVolume else 4
-    # row_heights = [.7, .15, .15] if noVolume else [.6, .13, .13, .14]
-    # subplot_titles = ("Price, Trend & Range", "Matrix", "CATS") if noVolume else ("Price, Trend & Range", "Volume", "Matrix", "CATS")
-    
-    row_count = 2 if noVolume else 3
-    row_heights = [.7, .3] if noVolume else [.6, .2, .2]
-    subplot_titles = ("Price, Trend & Range", "Matrix") if noVolume else ("Price, Trend & Range", "Volume", "Matrix")
-    
-    
+    row_count = 3 if noVolume else 4
+    row_heights = [.7, .15, .15] if noVolume else [.6, .13, .13, .14]
+    subplot_titles = ("Price, Trend & Range", "Matrix", "Crowding") if noVolume else ("Price, Trend & Range", "Volume", "Matrix", "Crowding")
+      
     fig = make_subplots(rows=row_count, cols=1, row_heights = row_heights, figure = layout_fig,
                         subplot_titles=subplot_titles, vertical_spacing=0.05)
 
@@ -809,34 +854,33 @@ def getCharts(asset, lookback):
     
     #%% Matrix Chart
     
-    #%% CATS Chart
-    # cats_row = 3 if noVolume else 4
+    #%% Crowding Chart
+    crowding_row = 3 if noVolume else 4
     
-    # # portUtils.get_cmap_value(volume["VolumeEnum"], -3, 1, 'Reds', True)
+    # portUtils.get_cmap_value(volume["VolumeEnum"], -3, 1, 'Reds', True)
     
     # fig.add_trace(go.Bar(
     #     x=df.index.values,
-    #     y=df["CATS"],
-    #     marker_color = portUtils.get_cmap_value(df["CATS"], -100.0, 100.0, 'RdYlGn'),
+    #     y=df["crowding_score"],
+    #     marker_color = df["crowding_color"].values,
     #     showlegend = False
-    # ), row=cats_row, col=1)
+    # ), row=crowding_row, col=1)
     
-    # fig.add_trace(go.Scatter(x=df.index.values, y=len(df["CATS"]) * [100.0],
-    #                          mode='lines',
-    #                          line=dict(color="gray", width=2, dash = "dash"),
-    #                          showlegend = False), row=cats_row, col=1)
+    addCrowding(fig, df, "Trim Shorts", crowding_row, 1)
+    addCrowding(fig, df, "Correction", crowding_row, 1)
+    addCrowding(fig, df, "Trim Longs", crowding_row, 1)
+    addCrowding(fig, df, "Squeeze", crowding_row, 1)
     
-    # fig.add_trace(go.Scatter(x=df.index.values, y=len(df["CATS"]) * [-100.0],
-    #                          mode='lines',
-    #                          line=dict(color="gray", width=2, dash = "dash"),
-    #                          showlegend = False), row=cats_row, col=1)
     
-    # fig.update_yaxes({
-    #         "title": {"text": "CATS", "standoff": 25},
-    #         "side": "right",
-    #         "tickprefix": "     ",
-    #         'showgrid': False
-    #     }, row=cats_row, col=1)
+    fig.update_yaxes({
+            "title": {"text": "Crowding", "standoff": 25},
+            "range" : [-50.0, 100.0],
+            "side": "right",
+            "tickprefix": "     ",
+            'showgrid': False,
+            # "type": "log"
+        }, row=crowding_row, col=1)
+    
     #%%
     
     fig.layout.annotations[0].update(x=0.065)
@@ -846,7 +890,7 @@ def getCharts(asset, lookback):
         fig.layout.annotations[1].update(x=0.025)
     
     fig.layout.annotations[1 if noVolume else 2].update(x=0.025)
-    # fig.layout.annotations[2 if noVolume else 3].update(x=0.025)
+    fig.layout.annotations[2 if noVolume else 3].update(x=0.025)
     
     fig.update_layout(height=1100, barmode='overlay')
     
@@ -882,7 +926,8 @@ def getAssetStats(asset):
     lrAndTr = html.Tr([html.Td("LR", style=tdLabelStyles), html.Td(f"{asset.LR/100.0:.2%}" if isPercent else f"${asset.LR:.2f}"),
                     html.Td("TR", style=tdLabelStyles), html.Td(f"{asset.TR/100.0:.2%}" if isPercent else f"${asset.TR:.2f}")])
     
-    mfrAction = html.Tr([html.Td("MFR Action", style=tdLabelStyles), html.Td(asset.MfrAction, colSpan = 3)])
+    mfrAction = html.Tr([html.Td("MFR Action", style=tdLabelStyles), html.Td(asset.MfrAction),
+                    html.Td("Crowding", style=tdLabelStyles), html.Td(asset.Crowding_Text, style = {"color": asset.Crowding_TextColor, "backgroundColor": asset.Crowding_Color})])
     
     volumeAndChg1D = html.Tr([html.Td("Volume", style=tdLabelStyles), html.Td(asset.VolumeDesc, style = portUtils.getVolumeStyle(asset)),
                     html.Td("Chg 1D", style=tdLabelStyles), html.Td(f"{asset.Chg1D:.2%}", style = {"color": greenColor if asset.Chg1D > 0.0 else redColor})])

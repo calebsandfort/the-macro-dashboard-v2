@@ -1,5 +1,6 @@
 Ticker,Quantity,Entry
 Cash, 1, 1000000000.0
-EEM,1,1.0
+ARKK,1,1.0
+TLT,1,1.0
+TBT,1,1.0
 HYG,1,1.0
-EDV,1,1.0

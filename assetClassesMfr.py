@@ -202,6 +202,10 @@ class Asset:
             
             self.IV_Premium = np.nan
             self.IV_Skew = np.nan
+            self.Crowding_Score = np.nan
+            self.Crowding_Color = '#272727'
+            self.Crowding_TextColor = '#272727'
+            self.Crowding_Text = 'No vol data:('
 
         else:
             self.__dict__ = json.loads(j)
@@ -211,7 +215,7 @@ class Asset:
     def df_row(self):
         return [self.id, self.ticker, self.quantity, self.entry, self.last, self.Chg1D, self.Chg1M, self.Chg3M,
                 self.Momentum, self.MomentumEmoji, self.Trend, self.TrendEmoji, self.LR, self.TR, self.RPos, self.VolumeDesc,
-                self.MfrAction, self.CATS] 
+                self.MfrAction, self.CATS, self.Crowding_Text] 
        
     def toJson(self):
         d = self.__dict__.copy()
@@ -316,6 +320,10 @@ class Asset:
         self.price_data["skew"] = np.nan
         self.price_data["skew_zscore"] = np.nan
         self.price_data["iv_premium"] = np.nan
+        self.price_data["crowding_score"] = np.nan
+        self.price_data["crowding_color"] = '#272727'
+        self.price_data["crowding_text_color"] = '#272727'
+        self.price_data["crowding_text"] = 'No Vol Data:('
         
         if vol_data is not None:
             
@@ -327,11 +335,35 @@ class Asset:
             hvMean = technicals.calcHvMean(self.price_data)
             self.price_data["iv_premium"] = (self.price_data["put_iv"] / hvMean - 1.0).shift(1)
             self.price_data["skew_zscore"] = technicals.calcZScore(self.price_data, "skew", 251).shift(1)
+            self.price_data["crowding_score"] = self.price_data["iv_premium"] * self.price_data["skew_zscore"] * 100.0
+            
+            #squeeze
+            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_color'] = '#00441B'
+            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_text_color'] = 'white'
+            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_text'] = 'Squeeze'
+            
+            #trim longs
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_color'] = '#73C476'
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_text_color'] = '#272727'
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_text'] = 'Trim Longs'
+            
+            #correction
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_color'] = '#67000D'
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_text_color'] = 'white'
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_text'] = 'Correction'
+            
+            #trim shorts
+            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_color'] = '#FB6B4B'
+            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_text_color'] = '#272727'
+            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_text'] = 'Trim Shorts'
             
             self.IV_Premium = self.procureLastValue("iv_premium")
             self.IV_Skew = self.procureLastValue("skew_zscore")
-            
-                
+            self.Crowding_Score = self.procureLastValue("crowding_score")
+            self.Crowding_Color = self.procureLastValue("crowding_color")
+            self.Crowding_TextColor = self.procureLastValue("crowding_text_color")
+            self.Crowding_Text = self.procureLastValue("crowding_text")
+
         #%%
         
         #%% CATS
@@ -502,7 +534,7 @@ class AssetCollection:
                 self.collection[ticker] = existing[ticker]
                 
         self.df = pd.DataFrame(columns = ["id", "Ticker", "Quantity", "Entry", "Last", "Chg1D", "Chg1M", "Chg3M", "Momentum", "MomentumEmoji",
-                                          "Trend", "TrendEmoji", "LR", "TR", "RPos", "VolumeDesc", "MfrAction", "CATS"])
+                                          "Trend", "TrendEmoji", "LR", "TR", "RPos", "VolumeDesc", "MfrAction", "CATS", "Crowding_Text"])
         
         self.df.loc["Cash"] = self.collection["Cash"].df_row
         
@@ -537,6 +569,7 @@ class AssetCollection:
         
         for ticker in self.collection:
             self.collection[ticker].setCalculatedProperties(self.df, self.isPortfolio)
+            
                 
     def toDict(self):
         temp = {}
