@@ -25,8 +25,8 @@ tickerLookup = {
 
 correlationTickers = ["DXY", "SPY", "US10Y", "US30Y", "VIX"]
 
-def getMfrData():
-    file_path = "mfr"
+def getRangeData(generic_ranges):
+    file_path = "mfr" if not generic_ranges else "generic_ranges"
     files = os.listdir(file_path)
     
     data = {}
@@ -40,8 +40,8 @@ def getMfrData():
         
     return data
         
-def getMfrDataAsList():
-    temp = getMfrData()
+def getRangeDataAsList(generic_ranges):
+    temp = getRangeData(generic_ranges)
     
     l = []
     
@@ -61,8 +61,8 @@ def getDisplayTickerFromMfrTicker(mfrTicker):
         
     return mfrTicker
 
-def getAllMfrTickers():
-    mfrDataList = getMfrDataAsList()
+def getAllRangeTickers(generic_ranges):
+    mfrDataList = getRangeDataAsList(generic_ranges)
     tickers = [ getDisplayTickerFromMfrTicker(ticker) for ticker in mfrDataList[0]["data"].index.values]
     
     return tickers
@@ -119,9 +119,11 @@ class MfrChange:
         
         return listGroupItem
         
-def getAllMfrChanges():
-    mfrDataList = getMfrDataAsList()
+def getAllRangeChanges(generic_ranges):
+    mfrDataList = getRangeDataAsList(generic_ranges)
     allMfrChanges = []
+    
+    momentum_column_name = "Momentum" if generic_ranges else "30D HH/LL"
     
     for i in range(len(mfrDataList) - 1):
         currentDate = mfrDataList[i]["date"]
@@ -135,20 +137,18 @@ def getAllMfrChanges():
                     allMfrChanges.append(MfrChange(currentDate, getDisplayTickerFromMfrTicker(ticker), "Trend",
                                                    oldData.at[ticker, "Trend"].capitalize(), currentData.at[ticker, "Trend"].capitalize()))
                                    
-                if currentData.at[ticker, "30D HH/LL"] != oldData.at[ticker, "30D HH/LL"]:
+                if currentData.at[ticker, momentum_column_name] != oldData.at[ticker, momentum_column_name]:
                     allMfrChanges.append(MfrChange(currentDate, getDisplayTickerFromMfrTicker(ticker), "Momentum",
-                                                   oldData.at[ticker, "30D HH/LL"].capitalize(), currentData.at[ticker, "30D HH/LL"].capitalize()))
+                                                   oldData.at[ticker, momentum_column_name].capitalize(), currentData.at[ticker, momentum_column_name].capitalize()))
     
     
     return allMfrChanges
 
-amc = getAllMfrChanges()
-
-def getMfrChangesForTicker(ticker):
+def getMfrChangesForTicker(ticker, amc):
     return list(filter(lambda x: x.ticker == ticker, amc))
 
-def getMfrChangeListGroupItemsForTicker(ticker):
-    changes_list = getMfrChangesForTicker(ticker)
+def getMfrChangeListGroupItemsForTicker(ticker, amc):
+    changes_list = getMfrChangesForTicker(ticker, amc)
     
     list_group_items = [x.getListGroupItem() for x in changes_list]
     
@@ -204,8 +204,8 @@ class Asset:
             self.IV_Skew = np.nan
             self.Crowding_Score = np.nan
             self.Crowding_Color = '#272727'
-            self.Crowding_TextColor = '#272727'
-            self.Crowding_Text = 'No vol data:('
+            self.Crowding_TextColor = '#c4cad4'
+            self.Crowding_Text = 'No data:('
 
         else:
             self.__dict__ = json.loads(j)
@@ -224,7 +224,7 @@ class Asset:
         return json.dumps(d);
 
     
-    def setDataAndTechnicals(self, price_data, mfr_data_dict, vol_data):
+    def setDataAndTechnicals(self, price_data, mfr_data_dict, vol_data, generic_ranges):
         self.price_data = price_data
         
         self.last = self.price_data.at[self.price_data.index[-1], "close"]
@@ -250,14 +250,14 @@ class Asset:
         for date in mfr_data_dict:
             mfr_data = mfr_data_dict[date]
             if self.mfr_ticker in mfr_data.index:
-                self.price_data.at[date, 'Momentum'] = mfr_data.at[self.mfr_ticker, "30D HH/LL"]
+                self.price_data.at[date, 'Momentum'] = mfr_data.at[self.mfr_ticker, "Momentum" if generic_ranges else "30D HH/LL"]
                 
                 self.price_data.at[date, 'Trend'] = mfr_data.at[self.mfr_ticker, "Trend"]
                 
-                self.price_data.at[date, 'LR'] = mfr_data.at[self.mfr_ticker, "Lower Fractal Range"]
+                self.price_data.at[date, 'LR'] = mfr_data.at[self.mfr_ticker, "Lower Range" if generic_ranges else "Lower Fractal Range"]
                 self.LR = self.price_data.at[self.price_data.index[-1], "LR"]
                 
-                self.price_data.at[date, 'TR'] = mfr_data.at[self.mfr_ticker, "Upper Fractal Range"]
+                self.price_data.at[date, 'TR'] = mfr_data.at[self.mfr_ticker, "Upper Range" if generic_ranges else "Upper Fractal Range"]
                 self.TR = self.price_data.at[self.price_data.index[-1], "TR"]
                 
         self.MfrAction = getMfrAction(self.procureLastValue("Trend"), self.procureLastValue("Momentum"))
@@ -279,8 +279,19 @@ class Asset:
         self.price_data['MomentumEmoji'] = self.price_data['Momentum'].apply(lambda x: getSentimentEmoji(x))
         self.MomentumEmoji = self.procureLastValue("MomentumEmoji")
         
+        ydayMomentumEmoji = self.procureLastValue("MomentumEmoji", -2)
+        
+        if (self.MomentumEmoji != ydayMomentumEmoji) and (ydayMomentumEmoji != ''):
+            self.MomentumEmoji = f'{ydayMomentumEmoji} ➡️ {self.MomentumEmoji}'
+        
+        
         self.price_data['TrendEmoji'] = self.price_data['Trend'].apply(lambda x: getSentimentEmoji(x))
         self.TrendEmoji = self.procureLastValue("TrendEmoji")
+        
+        ydayTrendEmoji = self.procureLastValue("TrendEmoji", -2)
+        
+        if (self.TrendEmoji != ydayTrendEmoji) and (ydayTrendEmoji != ''):
+            self.TrendEmoji = f'{ydayTrendEmoji} ➡️ {self.TrendEmoji}'
         
         self.price_data["TrendInt"] = self.price_data['Trend'].apply(lambda x: getTrendInt(x))
         
@@ -322,8 +333,8 @@ class Asset:
         self.price_data["iv_premium"] = np.nan
         self.price_data["crowding_score"] = np.nan
         self.price_data["crowding_color"] = '#272727'
-        self.price_data["crowding_text_color"] = '#272727'
-        self.price_data["crowding_text"] = 'No Vol Data:('
+        self.price_data["crowding_text_color"] = '#c4cad4'
+        self.price_data["crowding_text"] = 'No data:('
         
         if vol_data is not None:
             
@@ -504,8 +515,8 @@ class Asset:
         
         self.data_and_technicals_set = True
         
-    def procureLastValue(self, col):
-        return self.price_data.at[self.price_data.index[-1], col]
+    def procureLastValue(self, col, n = -1):
+        return self.price_data.at[self.price_data.index[n], col]
     
     def setCalculatedProperties(self, collectionDf, isPortfolio):
         if isPortfolio:
@@ -517,7 +528,8 @@ class Asset:
     
     
 class AssetCollection:
-    def __init__(self, csvFileName = None, existing = None, refreshData = False, isPortfolio = True):
+    def __init__(self, csvFileName = None, existing = None, refreshData = False, isPortfolio = True, generic_ranges = False):
+        print(generic_ranges)
         self.collection = {}
         self.isPortfolio = isPortfolio
         
@@ -543,12 +555,12 @@ class AssetCollection:
         allTickers = [ticker for ticker in self.collection]
         allTickers.remove("Cash")
         price_data, vol_data = dr.GetDataFromCsv(allTickers, True)
-        mfr_data = getMfrData()
+        range_data = getRangeData(generic_ranges)
         
         for ticker in allTickers:
             if ticker != "Cash":
                 if not self.collection[ticker].data_and_technicals_set:
-                    self.collection[ticker].setDataAndTechnicals(price_data[ticker], mfr_data, vol_data[ticker])
+                    self.collection[ticker].setDataAndTechnicals(price_data[ticker], range_data, vol_data[ticker], generic_ranges)
                 
                 self.df.loc[ticker] = self.collection[ticker].df_row
              
@@ -631,7 +643,7 @@ def getMfrAction(trend, momentum):
     return action
         
 
-# blah = getAllMfrTickers()
+# blah = getAllRangeTickers()
 
 # d = blah.toDict()
 

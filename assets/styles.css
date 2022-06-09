@@ -12,8 +12,8 @@
     }
 }
 
-#asset-modal-header{
-    justify-content: center;
+#asset-modal-header .modal-title{
+    width: 100%;
 }
 
 #eth-btc-comparison-modal text[style*="font-size: 9px"] {

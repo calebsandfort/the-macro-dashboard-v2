@@ -30,6 +30,9 @@ parser.add_argument("-r", "--refresh", help="refresh data",
 parser.add_argument("-d", "--debug", help="debug",
                     action="store_true")
 
+parser.add_argument("-g", "--generic_ranges", help="generic ranges",
+                    action="store_true")
+
 args = parser.parse_args()
 if args.refresh:
     helper.refreshData()
@@ -68,17 +71,19 @@ chartTransNeutral = 'rgba(255,255,28,0.2)'
 chartSolidNeutralDanger = "#0085FF"
 chartTransNeutralDanger = 'rgba(49,77,102,0.2)'
 
+amc = ac.getAllRangeChanges(args.generic_ranges)
+
 def extendAllAssets(collection):
     for ticker in collection:
         if ticker not in allAssets:
             allAssets[ticker] = collection[ticker]
 
 print("portfolio")
-portfolio = ac.AssetCollection("Portfolio.csv")
+portfolio = ac.AssetCollection("Portfolio.csv", args.generic_ranges, generic_ranges = args.generic_ranges)
 print("marketSnapshot")
-marketSnapshot = ac.AssetCollection("MarketSnapshot.csv")
+marketSnapshot = ac.AssetCollection("MarketSnapshot.csv", args.generic_ranges, generic_ranges = args.generic_ranges)
 print("potentials")
-potentials = ac.AssetCollection("Potentials.csv")
+potentials = ac.AssetCollection("Potentials.csv", args.generic_ranges, generic_ranges = args.generic_ranges)
 
 allAssets = {}
 
@@ -95,9 +100,12 @@ for ticker in allAssets:
 
 
 print("watchlist")
-watchlist = ac.AssetCollection(None, watchlistDict, isPortfolio = False)
+watchlist = ac.AssetCollection(None, watchlistDict, isPortfolio = False, generic_ranges = args.generic_ranges)
 
 print("done")
+
+equityTickers = ["SPY", "QQQ", "IWM", "VIX"]
+bondTickers = ["US10Y", "US30Y", "TLT", "HYG", "LQD"]
 
 def get_assets_data_table(name, assetCollection):
     columns = [
@@ -340,19 +348,18 @@ def get_side_bar():
                          html.Th("Chg"),
                          html.Th("Trd"),
                          html.Th("Mtum"),
-                         html.Th("R Pos")],
+                         html.Th("R Pos"),
+                         html.Th("Crowding")],
                         className = "font-weight-bold",
                         style = {"backgroundColor": "#15191E",
                                  "fontSize": "1.1em"})
     
     table_header = [
-        html.Thead(html.Tr([html.Th("Equities", colSpan = 6, className="bg-info font-weight-bolder text-center h5")]))
+        html.Thead(html.Tr([html.Th("Equities", colSpan = 7, className="bg-info font-weight-bolder text-center h5")]))
     ]
     
     rows = []
     rows.append(header_row)    
-    
-    equityTickers = ["SPY", "QQQ", "IWM", "VIX"]
     
     index = 0
     
@@ -360,7 +367,7 @@ def get_side_bar():
         asset = marketSnapshot.collection[ticker]
         rows.append(html.Tr([html.Td(ticker, className = "font-weight-bold", id = {
             "type": "ticker-td",
-            "index": index
+            "index": f"{index}:equities"
             }),
                              html.Td(f"${asset.last:.2f}"),
                              html.Td(f"{asset.Chg1D:.2%}",
@@ -368,7 +375,8 @@ def get_side_bar():
                              html.Td(asset.TrendEmoji, className = "text-center"),
                              html.Td(asset.MomentumEmoji, className = "text-center"),
                              html.Td(f"{asset.RPos:.2f}", style = portUtils.get_single_cmap_style(asset.RPos, 0.0, 1.0, cmap='RdYlGn', reverse=False, low=0, high=0,
-                                                                                                  st_threshold_1=0.75, st_threshold_2=0.25, white_threshold_1=0.75, white_threshold_2=0.25))],
+                                                                                                  st_threshold_1=0.75, st_threshold_2=0.25, white_threshold_1=0.75, white_threshold_2=0.25)),
+                             html.Td(asset.Crowding_Text, style={'color': asset.Crowding_TextColor, 'backgroundColor': asset.Crowding_Color})],
                             style = {"backgroundColor": "#272727"}))
         
         index += 1
@@ -379,13 +387,11 @@ def get_side_bar():
     
     #### Bonds/Credit
     table_header = [
-        html.Thead(html.Tr([html.Th("Bonds/Credit", colSpan = 6, className="bg-warning font-weight-bolder text-center h5")]))
+        html.Thead(html.Tr([html.Th("Bonds/Credit", colSpan = 7, className="bg-warning font-weight-bolder text-center h5")]))
     ]
     
     rows = []
     rows.append(header_row)    
-    
-    bondTickers = ["US10Y", "US30Y", "TLT", "HYG", "LQD"]
     
     for ticker in bondTickers:
         asset = marketSnapshot.collection[ticker]
@@ -398,7 +404,7 @@ def get_side_bar():
         
         rows.append(html.Tr([html.Td(ticker, className = "font-weight-bold", id = {
             "type": "ticker-td",
-            "index": index
+            "index": f"{index}:bonds"
             }),
                              html.Td(f"{asset.last/100.0:.2%}" if isPercent else f"${asset.last:.2f}"),
                              html.Td(f"{asset.Chg1D:.2%}",
@@ -406,7 +412,8 @@ def get_side_bar():
                              html.Td(asset.TrendEmoji, className = "text-center"),
                              html.Td(asset.MomentumEmoji, className = "text-center"),
                              html.Td(f"{asset.RPos:.2f}", style = portUtils.get_single_cmap_style(asset.RPos, 0.0, 1.0, cmap='RdYlGn', reverse=False, low=0, high=0,
-                                                                                                  st_threshold_1=0.75, st_threshold_2=0.25, white_threshold_1=0.75, white_threshold_2=0.25))],
+                                                                                                  st_threshold_1=0.75, st_threshold_2=0.25, white_threshold_1=0.75, white_threshold_2=0.25)),
+                             html.Td(asset.Crowding_Text, style={'color': asset.Crowding_TextColor, 'backgroundColor': asset.Crowding_Color})],
                             style = {"backgroundColor": "#272727"}))
         
         index += 1
@@ -417,7 +424,7 @@ def get_side_bar():
     
     #### Potentials
     table_header = [
-        html.Thead(html.Tr([html.Th("Potentials", colSpan = 6, className="bg-primary font-weight-bolder text-center h5")]))
+        html.Thead(html.Tr([html.Th("Potentials", colSpan = 7, className="bg-primary font-weight-bolder text-center h5")]))
     ]
     
     rows = []
@@ -437,7 +444,7 @@ def get_side_bar():
         
         rows.append(html.Tr([html.Td(ticker, className = "font-weight-bold", id = {
             "type": "ticker-td",
-            "index": index
+            "index": f"{index}:potentials"
             }),
                              html.Td(f"{asset.last/100.0:.2%}" if isPercent else f"${asset.last:.2f}"),
                              html.Td(f"{asset.Chg1D:.2%}",
@@ -445,7 +452,8 @@ def get_side_bar():
                              html.Td(asset.TrendEmoji, className = "text-center"),
                              html.Td(asset.MomentumEmoji, className = "text-center"),
                              html.Td(f"{asset.RPos:.2f}", style = portUtils.get_single_cmap_style(asset.RPos, 0.0, 1.0, cmap='RdYlGn', reverse=False, low=0, high=0,
-                                                                                                  st_threshold_1=0.75, st_threshold_2=0.25, white_threshold_1=0.75, white_threshold_2=0.25))],
+                                                                                                  st_threshold_1=0.75, st_threshold_2=0.25, white_threshold_1=0.75, white_threshold_2=0.25)),
+                             html.Td(asset.Crowding_Text, style={'color': asset.Crowding_TextColor, 'backgroundColor': asset.Crowding_Color})],
                             style = {"backgroundColor": "#272727"}))
         
         index += 1
@@ -459,7 +467,7 @@ def get_side_bar():
                         className="bg-secondary text-white text-center", style=dict(paddingTop = ".35rem", paddingBottom = ".35rem")),
     dbc.CardBody(
         dbc.ListGroup(
-            [x.getListGroupItem(smallFont = True, showTicker = True) for x in ac.amc[:50]],
+            [x.getListGroupItem(smallFont = True, showTicker = True) for x in amc[:50]],
             flush=True,
             style=dict(height = "400px", overflow = "auto")
             ),
@@ -949,9 +957,10 @@ def getMiniChartTabs(asset):
     
     tabs = dbc.Tabs(
         [
-            dbc.Tab(asset_crowding_tab_content, label="Crowding"),
-            dbc.Tab(correlation_tab_content, label="Correlations"),
-        ]
+            dbc.Tab(asset_crowding_tab_content, tab_id="crowding_tab", label="Crowding"),
+            dbc.Tab(correlation_tab_content, tab_id="correlations_tab", label="Correlations"),
+        ],
+        active_tab="crowding_tab"
     )
     
     return tabs
@@ -1026,7 +1035,7 @@ def getAssetCrowdingChart(asset):
         y_list = y_list[-lookback:]
         
         if ((len(x_list) == 0) or (len(x_list) != len(y_list))):
-            return "No vol data"
+            return "No data:("
         
         colors_range = range(lookback)
         colors_df = pd.DataFrame({
@@ -1102,7 +1111,7 @@ def getAssetCrowdingChart(asset):
         
         content = dcc.Graph(figure=fig)
     else:
-        content = "No vol data:("
+        content = "No data:("
     
     return content
 
@@ -1243,7 +1252,7 @@ def getAssetRecentChanges(asset):
                         className="bg-primary text-white text-center", style=dict(paddingTop = ".35rem", paddingBottom = ".35rem")),
     dbc.CardBody(
         dbc.ListGroup(
-            ac.getMfrChangeListGroupItemsForTicker(asset.ticker),
+            ac.getMfrChangeListGroupItemsForTicker(asset.ticker, amc),
             flush=True,
             style=dict(height = "243px", overflow = "auto")
             ),
@@ -1258,7 +1267,7 @@ def getAssetRecentChanges(asset):
     # rows = []
     
     # recentChanges = dbc.ListGroup(
-    #     ac.getMfrChangeListGroupItemsForTicker(asset.ticker),
+    #     ac.getMfrChangeListGroupItemsForTicker(asset.ticker, amc),
     # )
     
     # rows.append(html.Tr(html.Td(recentChanges)))
@@ -1312,6 +1321,7 @@ def getAssetModalContent(asset):
 
 app.layout = html.Div(
     [
+     dcc.Store(id="asset_modal_store", data = {"collection": "", "active_ticker": ""}),
      dbc.Modal([
          dbc.ModalHeader("Test", id="asset-modal-header", className = "bg-info"),
          dbc.ModalBody(
@@ -1358,7 +1368,7 @@ app.layout = html.Div(
              dbc.Row(
                  [dbc.Col(
                      get_side_bar(),
-                     xs=2,
+                     xs=3,
                      className="dbc_dark"
                  ),
                      dbc.Col(
@@ -1366,13 +1376,14 @@ app.layout = html.Div(
                           getAssetsDataTableWrapper("portfolio", portfolio, "bg-success"),
                           getAssetsDataTableWrapper("watchlist", watchlist, "bg-danger")
                           ],
-                     xs=10,
+                     xs=9,
                      id="main_content"
                  )],
                  className="dbc_dark mt-4"
              )
          ])
      ])
+
 
 @app.callback(
     Output('correlation_chart_wrapper', 'children'),
@@ -1390,34 +1401,113 @@ def update_correlation_chart(blah, c):
         
     return dash.no_update if ticker == "" else getCorrelationChart(allAssets[ticker])
 
+def get_next_nav_ticker(ticker_list, current_ticker):
+    ticker_list.remove('Cash')
+    next_ticker = ""
+    ticker_list_len = len(ticker_list)
+    
+    for i in range(ticker_list_len):
+        t = ticker_list[i]
+        
+        if (t == current_ticker) and (i == (ticker_list_len - 1)):
+            next_ticker = ticker_list[0]
+        elif (t == current_ticker):
+            next_ticker = ticker_list[i + 1]
+            
+    return next_ticker
+
+def get_prev_nav_ticker(ticker_list, current_ticker):
+    ticker_list.remove('Cash')
+    prev_ticker = ""
+    ticker_list_len = len(ticker_list)
+    
+    for i in range(ticker_list_len):
+        t = ticker_list[i]
+        
+        if (t == current_ticker) and (i == 0):
+            prev_ticker = ticker_list[ticker_list_len - 1]
+        elif (t == current_ticker):
+            prev_ticker = ticker_list[i - 1]
+            
+    return prev_ticker
+
 @app.callback(
-    [Output('asset-modal-body', 'children'), Output('asset-modal-header', 'children'), Output('asset_modal', 'is_open')],
-    [Input("portfolio_assets_data_table", "active_cell"), Input("watchlist_assets_data_table", "active_cell"), Input({'type': 'ticker-td', 'index': ALL}, 'n_clicks')],
-    State({'type': 'ticker-td', 'index': ALL}, 'children')
+    [Output('asset-modal-body', 'children'), Output('asset-modal-header', 'children'), Output('asset_modal', 'is_open'), Output("asset_modal_store", "data")],
+    [Input("portfolio_assets_data_table", "active_cell"), Input("watchlist_assets_data_table", "active_cell"),
+     Input({'type': 'nav_button', 'index': ALL}, 'n_clicks'), Input({'type': 'ticker-td', 'index': ALL}, 'n_clicks')],
+    [State({'type': 'ticker-td', 'index': ALL}, 'children'), State("asset_modal_store", "data")]
     )
-def update_asset_modal(portfolio_assets_data_table_active_cell, watchlist_assets_data_table_active_cell, blah, c):
+def update_asset_modal(portfolio_assets_data_table_active_cell, watchlist_assets_data_table_active_cell, nav_button,
+                       blah, c, asset_modal_store_data):
     ctx = dash.callback_context
 
     ticker = ""
+    collection = ""
 
     if len(ctx.triggered) > 0 and "portfolio_assets_data_table.active_cell" in ctx.triggered[0]['prop_id']:
         ticker = portfolio_assets_data_table_active_cell['row_id']
+        collection = "portfolio"
     elif len(ctx.triggered) > 0 and "watchlist_assets_data_table.active_cell" in ctx.triggered[0]['prop_id']:
         ticker = watchlist_assets_data_table_active_cell['row_id']
+        collection = "watchlist"
     elif len(ctx.triggered) > 0 and "ticker-td" in ctx.triggered[0]['prop_id']:
         prop_id_dict = json.loads(ctx.triggered[0]['prop_id'].replace(".n_clicks", ""))
-        ticker = c[prop_id_dict['index']]
-    
+        
+        split = prop_id_dict['index'].split(":")
+        ticker = c[int(split[0])]
+        collection = split[1]
+    elif len(ctx.triggered) > 0 and "nav_button" in ctx.triggered[0]['prop_id']:
+        prop_id_dict = json.loads(ctx.triggered[0]['prop_id'].replace(".n_clicks", ""))
+        isNext = prop_id_dict['index'] == 1
+        
+        ticker_list = ""
+        collection = asset_modal_store_data["collection"]
+        
+        if collection == "portfolio":
+            ticker_list = [*portfolio.collection]
+        elif collection == "watchlist":
+            ticker_list = [*watchlist.collection]
+        elif collection == "potentials":
+            ticker_list = [*potentials.collection]
+        elif collection == "equities":
+            ticker_list = [*equityTickers]
+        elif collection == "bonds":
+            ticker_list = [*bondTickers]
+            
+        if isNext:
+            ticker = get_next_nav_ticker(ticker_list, asset_modal_store_data["active_ticker"])
+        else:
+            ticker = get_prev_nav_ticker(ticker_list, asset_modal_store_data["active_ticker"])
+            
+        
+        
     renderModal = ticker != ""
     content = ""
+    headerContent = ""
     
     if renderModal:
         
         asset = allAssets[ticker]
         
         content = getAssetModalContent(asset)
+        
+        headerContent = dbc.Container(
+            fluid=True,
+            className="px-0",
+            children=dbc.Row(dbc.Col(
+                html.Div([dbc.Button("Prev", id = {
+                    "type": "nav_button",
+                    "index": 0
+                    }, className="me-2", color="primary", size="lg", n_clicks=0),
+                          html.Div(f"{ticker} - Chart and Technicals"),
+                          dbc.Button("Next", id = {
+                              "type": "nav_button",
+                              "index": 1
+                              }, className="me-2", color="primary", size="lg", n_clicks=0)],
+                         className="d-flex justify-content-between"), xs=12
+            )))
 
-    return content, f"{ticker} - Chart and Technicals", renderModal
+    return content, headerContent, renderModal, {"collection": collection, "active_ticker": ticker}
 
 if __name__ == '__main__':
     app.run_server(debug=(args.debug), port='5435')

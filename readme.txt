@@ -1,7 +1,7 @@
 Notes
 - This was designed for my personal use to better visualize MyFractalRanges ranges and bring together other variables that I like to look at when 
   making a trade, as well as managing my overall portfolio. It sources price data from TD Ameritrade because it is free and real time.
-  You could swap out ranges and data if you wanted.
+  You can also provide ranges from whatever source you desire. See "Usage -> Optional flags -> b" for more details.
 - The data does not update as the app is running, although that is something that could be added.
 - The crowding data is free-ish. Due to that fact, it is not available for every ticker.
     - An explanation of how to interpret the crowding chart can be found at the bottom of this page: https://42macro.com/faq/
@@ -46,6 +46,9 @@ Usage
 2. Optional flags
     a. "-r" => this will download up to date data for your tickers => "python macroDashboardMfr.py -r"
     b. "-d" => this will run the project in debug mode. Useful if you are coding => "python macroDashboardMfr.py -d"
+    b. "-g" => this will run the project using ranges provided by you.
+        -> See sample files in "generic_ranges" folder for format
+        -> Trend/Momentum support values of "bearish", "bullish" and "neutral"
     
     
 Useful links
