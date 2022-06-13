@@ -15,6 +15,7 @@ import technicals
 from operator import itemgetter
 import dash_bootstrap_components as dbc
 from dash import html
+import math
 
 tickerLookup = {
     "VIX": { "tda": "$VIX.X", "mfr": "^VIX" },
@@ -206,6 +207,8 @@ class Asset:
             self.Crowding_Color = '#272727'
             self.Crowding_TextColor = '#c4cad4'
             self.Crowding_Text = 'No data:('
+            
+            self.Monthly_Vol = 0.0
 
         else:
             self.__dict__ = json.loads(j)
@@ -215,7 +218,7 @@ class Asset:
     def df_row(self):
         return [self.id, self.ticker, self.quantity, self.entry, self.last, self.Chg1D, self.Chg1M, self.Chg3M,
                 self.Momentum, self.MomentumEmoji, self.Trend, self.TrendEmoji, self.LR, self.TR, self.RPos, self.VolumeDesc,
-                self.MfrAction, self.CATS, self.Crowding_Text] 
+                self.MfrAction, self.CATS, self.Crowding_Text, self.Monthly_Vol] 
        
     def toJson(self):
         d = self.__dict__.copy()
@@ -374,7 +377,6 @@ class Asset:
             self.Crowding_Color = self.procureLastValue("crowding_color")
             self.Crowding_TextColor = self.procureLastValue("crowding_text_color")
             self.Crowding_Text = self.procureLastValue("crowding_text")
-
         #%%
         
         #%% CATS
@@ -525,15 +527,82 @@ class Asset:
         
         self.last = collectionDf.at[self.ticker, "Last"]
         self.MfrAction = collectionDf.at[self.ticker, "MfrAction"]
+        
+        if self.ticker != "Cash":
+            self.calcMonthlyVol()
+
+    def calcMonthlyVol(self):     
+        
+        original_closes = self.price_data["close"].values
     
+        r = list(range(-1, (-20 * 36) - 1, -20))
+    
+        new_closes = []
+        pct_chgs = []
+    
+        len_original_closes = len(original_closes)
+    
+        for i in r:
+            if abs(i) < len_original_closes:
+                new_closes.insert(0, original_closes[i])
+            else:
+                print(f"{self.ticker} not enough data")
+                break
+    
+        for i in range(0, len(new_closes) - 1):
+            pct_chgs.append((new_closes[i + 1] - new_closes[i])/new_closes[i])
+    
+        mean = sum(pct_chgs) / len(pct_chgs)
+        variance = sum([((x - mean) ** 2) for x in pct_chgs]) / len(pct_chgs)
+        monthly_vol = variance ** 0.5
+        
+        self.Monthly_Vol = monthly_vol
+        
+    def calcPositionSizeValues(self, portfolio_value, max_loss):
+        stop_loss_sigma = 1.5
+        stop_loss_offset = self.last * stop_loss_sigma * self.Monthly_Vol
+        stop_loss_ptg = stop_loss_offset / self.last
+        stop_loss_percent = max_loss / 100.0
+        stop_loss_notional_value = portfolio_value * stop_loss_percent
+
+        profit_target_sigma = 2.25
+        profit_target_offset = self.last * profit_target_sigma * self.Monthly_Vol
+        profit_target_ptg = profit_target_offset / self.last
+
+        shares = math.floor(stop_loss_notional_value / stop_loss_offset)
+        notional_value = shares * self.last
+        profit_target_gain = profit_target_offset * shares / portfolio_value
+
+        long_stop_loss_value = self.last - stop_loss_offset
+        long_profit_target_value = self.last + profit_target_offset
+
+        short_stop_loss_value = self.last + stop_loss_offset
+        short_profit_target_value = self.last - profit_target_offset
+        
+        return dict(
+            monthly_vol = self.Monthly_Vol,
+            max_loss = stop_loss_percent,
+            target_gain = profit_target_gain,
+            
+            current_price = self.last,
+            shares = shares,
+            notional_value = notional_value,
+            
+            long_stop_loss_value = long_stop_loss_value,
+            long_profit_target_value = long_profit_target_value,
+            
+            short_stop_loss_value = short_stop_loss_value,
+            short_profit_target_value = short_profit_target_value,
+            
+            stop_loss_ptg = stop_loss_ptg,
+            profit_target_ptg = profit_target_ptg
+            )
     
 class AssetCollection:
     def __init__(self, csvFileName = None, existing = None, refreshData = False, isPortfolio = True, generic_ranges = False):
-        print(generic_ranges)
         self.collection = {}
         self.isPortfolio = isPortfolio
-        
-        
+
         if csvFileName is not None:
             temp = pd.read_csv(os.path.join(os.getcwd(), 'portfolios', csvFileName), index_col="Ticker") 
             
@@ -546,12 +615,10 @@ class AssetCollection:
                 self.collection[ticker] = existing[ticker]
                 
         self.df = pd.DataFrame(columns = ["id", "Ticker", "Quantity", "Entry", "Last", "Chg1D", "Chg1M", "Chg3M", "Momentum", "MomentumEmoji",
-                                          "Trend", "TrendEmoji", "LR", "TR", "RPos", "VolumeDesc", "MfrAction", "CATS", "Crowding_Text"])
+                                          "Trend", "TrendEmoji", "LR", "TR", "RPos", "VolumeDesc", "MfrAction", "CATS", "Crowding_Text", "Monthly_Vol"])
         
         self.df.loc["Cash"] = self.collection["Cash"].df_row
         
-        startDate = datetime.datetime.strptime('2019-05-01', '%Y-%m-%d')
-        endDate = datetime.datetime.today()
         allTickers = [ticker for ticker in self.collection]
         allTickers.remove("Cash")
         price_data, vol_data = dr.GetDataFromCsv(allTickers, True)
@@ -568,8 +635,11 @@ class AssetCollection:
         self.df["Cost Basis"] = self.df["Quantity"] * self.df["Entry"]
         self.df["Current Value"] = self.df["Quantity"] * self.df["Last"]
         
+        self.portfolio_value = 0.0
+        
         if isPortfolio:
-            self.df["Weight"] = self.df["Current Value"] / self.df["Current Value"].sum()
+            self.portfolio_value = self.df["Current Value"].sum()
+            self.df["Weight"] = self.df["Current Value"] / self.portfolio_value
             self.df["PnL"] = ((self.df["Last"] - self.df["Entry"]) / self.df["Entry"])
         else:
             self.df["Weight"] = 0.0
@@ -577,7 +647,7 @@ class AssetCollection:
         
         # print(self.df.head())
         
-        self.portfolio_value = 0.0
+        
         
         for ticker in self.collection:
             self.collection[ticker].setCalculatedProperties(self.df, self.isPortfolio)

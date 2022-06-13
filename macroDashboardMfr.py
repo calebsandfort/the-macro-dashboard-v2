@@ -955,15 +955,135 @@ def getMiniChartTabs(asset):
     
     correlation_tab_content = html.Div(getCorrelationContent(asset))
     
+    asset_recent_changes_tab_content = html.Div(getAssetRecentChanges(asset))
+    
     tabs = dbc.Tabs(
         [
             dbc.Tab(asset_crowding_tab_content, tab_id="crowding_tab", label="Crowding"),
             dbc.Tab(correlation_tab_content, tab_id="correlations_tab", label="Correlations"),
+            dbc.Tab(asset_recent_changes_tab_content, tab_id="asset_recent_changes_tab", label="Position Mgmt Calc", ),
         ],
         active_tab="crowding_tab"
     )
     
     return tabs
+
+def getPositionMgmtCalcTabContent(asset):
+    
+    table_header = [
+        html.Thead(html.Tr([html.Th("Position Management Calculator", colSpan = 1, className="bg-success font-weight-bolder text-center h5")]))
+    ]
+    
+    rows = []
+    
+    rows.append(html.Tr(html.Td(getPositionMgmtCalc(asset), id="position_mgmt_calc_wrapper", colSpan = 1)))
+    
+    table_body = [html.Tbody(rows)]
+    
+    position_mgmt_calc_table = dbc.Table(table_header + table_body, bordered=False, id="position_mgmt_calc_table", className="white_table compact_table")
+    
+    return position_mgmt_calc_table
+
+def getPositionMgmtCalc(asset):
+    form = dbc.Container(
+        fluid=True,
+        children=[dbc.Row(
+            [
+                dbc.Col(dbc.Label(
+                    "Direction", html_for="uxDropdown_direction"), width=3, className="pt-2 font-weight-bold"),
+                dbc.Col(dbc.Select(id="uxDropdown_direction",
+                                   options=[
+                                       {"label": "Long", "value": "Long"},
+                                       {"label": "Short", "value": "Short"},
+                                   ], value="Long",
+                                   ), width=3),
+                dbc.Col(dbc.Label("Max Loss"), width=3, className="pt-2 font-weight-bold"),
+                dbc.Col(
+                    dcc.Input(
+                        id="uxInput_MaxLoss",
+                        type="number",
+                        min=.25, max=5.0, step=.25, value=2.0,
+                        className="mt-1 w-100"
+                    ), width=3
+                ),
+                # dbc.Col(dbc.Button("Update", color="primary", id="uxButton_position_mgmt_calc", n_clicks=0), width = 2),
+            ],
+            className="g-2",
+        ),
+            dbc.Row(
+                [
+                    dbc.Col(getPositionMgmtTable(asset, "Long", 2.0), width=12, id="uxCol_PositionMgmtTable")
+
+                ],
+                className="g-2",
+
+        ),
+        dcc.Input(type="hidden", id="uxHidden_PositionMgmtCalc_Ticker", value=asset.ticker)
+        ]
+    )
+
+    return form
+
+def getPositionMgmtTable(asset, direction, max_loss):
+    values = asset.calcPositionSizeValues(portfolio.portfolio_value, max_loss)
+    
+    rows = []
+    
+    rows.append(html.Tr([html.Td("Monthly Vol", className="font-weight-bold"),
+                        html.Td("Max Loss", className="font-weight-bold"),
+                        html.Td("Target Gain", className="font-weight-bold")]))
+    
+    rows.append(html.Tr([html.Td(f"{values['monthly_vol']:.2%}"),
+                        html.Td(f"{values['max_loss']:.2%}", ),
+                        html.Td(f"{values['target_gain']:.2%}", )]))
+    
+    rows.append(html.Tr([html.Td("Shares", className="font-weight-bold"),
+                        html.Td("Current Price", className="font-weight-bold"),
+                        html.Td("Notional Value", className="font-weight-bold")]))
+    
+    rows.append(html.Tr([html.Td(f"{values['shares']}"),
+                        html.Td(f"${values['current_price']:,.2f}"),
+                        html.Td(f"${values['notional_value']:,.2f}")]))
+    
+    if direction == "Long":
+        rows.append(html.Tr([html.Td("Stop Price", className="font-weight-bold"),
+                            html.Td("Current Price", className="font-weight-bold"),
+                            html.Td("Target Price", className="font-weight-bold")]))
+        
+        rows.append(html.Tr([html.Td(f"${values['long_stop_loss_value']:,.2f}"),
+                            html.Td(f"${values['current_price']:,.2f}"),
+                            html.Td(f"${values['long_profit_target_value']:,.2f}")]))
+    else:
+        rows.append(html.Tr([html.Td("Target Price", className="font-weight-bold"),
+                            html.Td("Current Price", className="font-weight-bold"),
+                            html.Td("Stop Price", className="font-weight-bold")
+                            ]))
+        
+        rows.append(html.Tr([html.Td(f"${values['short_profit_target_value']:,.2f}"),
+                            html.Td(f"${values['current_price']:,.2f}"),
+                            html.Td(f"${values['short_stop_loss_value']:,.2f}")]))
+        
+    if direction == "Long":
+        rows.append(html.Tr([html.Td("Stop Ptg", className="font-weight-bold"),
+                            html.Td(""),
+                            html.Td("Target Ptg", className="font-weight-bold")]))
+        
+        rows.append(html.Tr([html.Td(f"{values['stop_loss_ptg']:.2%}"),
+                            html.Td(""),
+                            html.Td(f"{values['profit_target_ptg']:.2%}")]))
+    else:
+        rows.append(html.Tr([html.Td("Target Ptg", className="font-weight-bold"),
+                            html.Td(""),
+                            html.Td("Stop Ptg", className="font-weight-bold")
+                            ]))
+        
+        rows.append(html.Tr([html.Td(f"{values['profit_target_ptg']:.2%}"),
+                            html.Td(""),
+                            html.Td(f"{values['stop_loss_ptg']:.2%}")]))
+    
+    table_body = [html.Tbody(rows)]
+    
+    return dbc.Table(table_body, bordered=False, className="white_table compact_table")
 
 def getAssetCrowdingContent(asset):
     
@@ -987,7 +1107,7 @@ def getAssetCrowdingChart(asset):
     
     lookback = 10
     
-    if not np.isnan(asset.IV_Premium):
+    if (not np.isnan(asset.IV_Premium) and not np.isnan(asset.IV_Skew)):
         layout = {
             "template": "plotly_dark",
             "xaxis_rangeslider_visible": False,
@@ -1249,7 +1369,7 @@ def getAssetRecentChanges(asset):
     
     recentChangesCard = dbc.Card(
         [dbc.CardHeader(html.H5("Recent Changes", className="mb-0", style=dict(fontWeight = 700)),
-                        className="bg-primary text-white text-center", style=dict(paddingTop = ".35rem", paddingBottom = ".35rem")),
+                        className="bg-info text-white text-center", style=dict(paddingTop = ".35rem", paddingBottom = ".35rem")),
     dbc.CardBody(
         dbc.ListGroup(
             ac.getMfrChangeListGroupItemsForTicker(asset.ticker, amc),
@@ -1257,7 +1377,7 @@ def getAssetRecentChanges(asset):
             style=dict(height = "243px", overflow = "auto")
             ),
         className = "p-0"
-        )]
+        )], className = "pb-3"
     )
     
     # table_header = [
@@ -1306,7 +1426,7 @@ def getAssetModalContent(asset):
                 dbc.Row(
                     [
                         dbc.Col(
-                            getAssetRecentChanges(asset),
+                            getPositionMgmtCalcTabContent(asset),
                             xs=12,
                             className="dbc_dark"
                         )]
@@ -1386,6 +1506,15 @@ app.layout = html.Div(
 
 
 @app.callback(
+    (Output("uxCol_PositionMgmtTable", "children")),
+    [Input('uxDropdown_direction', 'value'), Input('uxInput_MaxLoss', 'value')],
+    (State("uxHidden_PositionMgmtCalc_Ticker", "value"))
+    )
+def update_position_mgmt_calc(direction, maxLoss, ticker):
+
+    return getPositionMgmtTable(allAssets[ticker], direction, maxLoss)
+
+@app.callback(
     Output('correlation_chart_wrapper', 'children'),
     Input({'type': 'ticker-corr', 'index': ALL}, 'n_clicks'),
     State({'type': 'ticker-corr', 'index': ALL}, 'children')
@@ -1402,7 +1531,9 @@ def update_correlation_chart(blah, c):
     return dash.no_update if ticker == "" else getCorrelationChart(allAssets[ticker])
 
 def get_next_nav_ticker(ticker_list, current_ticker):
-    ticker_list.remove('Cash')
+    if "Cash" in ticker_list:
+        ticker_list.remove('Cash')
+        
     next_ticker = ""
     ticker_list_len = len(ticker_list)
     
@@ -1417,7 +1548,10 @@ def get_next_nav_ticker(ticker_list, current_ticker):
     return next_ticker
 
 def get_prev_nav_ticker(ticker_list, current_ticker):
-    ticker_list.remove('Cash')
+    
+    if "Cash" in ticker_list:
+        ticker_list.remove('Cash')
+    
     prev_ticker = ""
     ticker_list_len = len(ticker_list)
     

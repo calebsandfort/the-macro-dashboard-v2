@@ -28,7 +28,7 @@ def refreshData():
     
     allTickers.extend(x for x in temp.index.values if x not in allTickers and x != 'Cash' and x != 'SDBA Cash')
     
-    startDate = datetime.datetime.strptime('2019-05-01', '%Y-%m-%d')
+    startDate = datetime.datetime.strptime('2016-05-01', '%Y-%m-%d')
     endDate = datetime.datetime.today()
     
     dr.GetTdaDataForTickers(allTickers, 'month', 'daily', 1, startDate, endDate, False, True)
@@ -37,6 +37,9 @@ def refreshData():
 
 # refreshData()
 
-# portfolio = ac.AssetCollection("Test.csv")
+# portfolio = ac.AssetCollection("Portfolio.csv")
+
+# asset = portfolio.collection["USO"]
+# t = asset.calcPositionSizeValues(portfolio.portfolio_value, 2.0)
 
 # test = ac.AssetCollection("Potentials.csv")
