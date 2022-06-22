@@ -156,7 +156,7 @@ def getMfrChangeListGroupItemsForTicker(ticker, amc):
     return list_group_items
 
 class Asset:
-    def __init__(self, ticker, quantity = 0.0, entry = 0.0, corrTicker = "", j = None):
+    def __init__(self, ticker, quantity = 0.0, entry = 0.0, corrTicker = "", j = None, stop = 0.0, target = 0.0):
         if j is None:
             self.id = ticker
             self.ticker = ticker
@@ -172,6 +172,11 @@ class Asset:
             self.quantity = quantity
             self.entry = entry
             self.cost_basis = self.quantity * self.entry
+            self.Stop = stop
+            self.Target = target
+
+            self.Stop_Ratio = 0.0
+            self.Target_Ratio = 0.0
 
             self.corrTicker = "" if corrTicker == "nil" else corrTicker
             
@@ -206,9 +211,7 @@ class Asset:
             self.Crowding_Score = np.nan
             self.Crowding_Color = '#272727'
             self.Crowding_TextColor = '#c4cad4'
-            self.Crowding_Text = 'No data:('
-            
-            self.Monthly_Vol = 0.0
+            self.Crowding_Text = 'No data:(' 
 
         else:
             self.__dict__ = json.loads(j)
@@ -218,7 +221,7 @@ class Asset:
     def df_row(self):
         return [self.id, self.ticker, self.quantity, self.entry, self.last, self.Chg1D, self.Chg1M, self.Chg3M,
                 self.Momentum, self.MomentumEmoji, self.Trend, self.TrendEmoji, self.LR, self.TR, self.RPos, self.VolumeDesc,
-                self.MfrAction, self.CATS, self.Crowding_Text, self.Monthly_Vol] 
+                self.MfrAction, self.CATS, self.Crowding_Text, self.Stop, self.Target] 
        
     def toJson(self):
         d = self.__dict__.copy()
@@ -232,9 +235,15 @@ class Asset:
         
         self.last = self.price_data.at[self.price_data.index[-1], "close"]
         self.price_data["IsUp"] = self.price_data['close'] > self.price_data['close'].shift(1)
+        self.price_data["stop"] = self.Stop
+        self.price_data["target"] = self.Target
+    
+        if self.Stop > 0.0:
+            self.Stop_Ratio = 1.0 - ((self.last - self.Stop) / (self.entry - self.Stop))
+            self.Target_Ratio = (self.last - self.entry) / (self.Target - self.entry)
     
         #%% Chg
-        self.price_data['Chg1D'] = (self.price_data['close'] / self.price_data['close'].shift(1)) - 1.0
+        self.price_data['Chg1D'] = np.log(self.price_data['close'] / self.price_data['close'].shift())
         self.Chg1D = self.price_data.at[self.price_data.index[-1], "Chg1D"]
         
         self.price_data['Chg1M'] = (self.price_data['close'] / self.price_data['close'].shift(21)) - 1.0
@@ -341,14 +350,17 @@ class Asset:
         
         if vol_data is not None:
             
+            vol_data.dropna(axis = 0, how ='any', inplace = True)
+            vol_data["skew_zscore"] = technicals.calcZScore(vol_data, "skew", 251)
+            
             for idx in vol_data.index:
                 if idx in self.price_data.index:
                     self.price_data.at[idx, "put_iv"] = vol_data.at[idx, "put_iv"]
-                    self.price_data.at[idx, "skew"] = vol_data.at[idx, "skew"]
+                    self.price_data.at[idx, "skew_zscore"] = vol_data.at[idx, "skew_zscore"]
             
             hvMean = technicals.calcHvMean(self.price_data)
             self.price_data["iv_premium"] = (self.price_data["put_iv"] / hvMean - 1.0).shift(1)
-            self.price_data["skew_zscore"] = technicals.calcZScore(self.price_data, "skew", 251).shift(1)
+            self.price_data["skew_zscore"] = self.price_data["skew_zscore"].shift(1)
             self.price_data["crowding_score"] = self.price_data["iv_premium"] * self.price_data["skew_zscore"] * 100.0
             
             #squeeze
@@ -526,16 +538,15 @@ class Asset:
             self.PnL = collectionDf.at[self.ticker, "PnL"]
         
         self.last = collectionDf.at[self.ticker, "Last"]
-        self.MfrAction = collectionDf.at[self.ticker, "MfrAction"]
-        
-        if self.ticker != "Cash":
-            self.calcMonthlyVol()
+        self.MfrAction = collectionDf.at[self.ticker, "MfrAction"]     
 
-    def calcMonthlyVol(self):     
+    def calcMonthlyVol(self, years):     
+        
+        months = int(years * 12)
         
         original_closes = self.price_data["close"].values
     
-        r = list(range(-1, (-20 * 36) - 1, -20))
+        r = list(range(-1, (-20 * months) - 1, -20))
     
         new_closes = []
         pct_chgs = []
@@ -556,17 +567,17 @@ class Asset:
         variance = sum([((x - mean) ** 2) for x in pct_chgs]) / len(pct_chgs)
         monthly_vol = variance ** 0.5
         
-        self.Monthly_Vol = monthly_vol
+        return monthly_vol
         
-    def calcPositionSizeValues(self, portfolio_value, max_loss):
-        stop_loss_sigma = 1.5
-        stop_loss_offset = self.last * stop_loss_sigma * self.Monthly_Vol
+    def calcPositionSizeValues(self, portfolio_value, years, max_loss, stop_loss_sigma, profit_target_sigma):
+        monthly_Vol= self.calcMonthlyVol(years)
+        
+        stop_loss_offset = self.last * stop_loss_sigma * monthly_Vol
         stop_loss_ptg = stop_loss_offset / self.last
         stop_loss_percent = max_loss / 100.0
         stop_loss_notional_value = portfolio_value * stop_loss_percent
 
-        profit_target_sigma = 2.25
-        profit_target_offset = self.last * profit_target_sigma * self.Monthly_Vol
+        profit_target_offset = self.last * profit_target_sigma * monthly_Vol
         profit_target_ptg = profit_target_offset / self.last
 
         shares = math.floor(stop_loss_notional_value / stop_loss_offset)
@@ -580,7 +591,7 @@ class Asset:
         short_profit_target_value = self.last - profit_target_offset
         
         return dict(
-            monthly_vol = self.Monthly_Vol,
+            monthly_vol = monthly_Vol,
             max_loss = stop_loss_percent,
             target_gain = profit_target_gain,
             
@@ -606,8 +617,12 @@ class AssetCollection:
         if csvFileName is not None:
             temp = pd.read_csv(os.path.join(os.getcwd(), 'portfolios', csvFileName), index_col="Ticker") 
             
+            hasExits = "Stop" in temp.columns
+            
             for ticker in temp.index.values:
-                self.collection[ticker] = Asset(ticker, temp.at[ticker, 'Quantity'], temp.at[ticker, 'Entry'])
+                self.collection[ticker] = Asset(ticker, temp.at[ticker, 'Quantity'], temp.at[ticker, 'Entry'],
+                                                stop = temp.at[ticker, 'Stop'] if hasExits else 0.0,
+                                                target = temp.at[ticker, 'Target'] if hasExits else 0.0)
                 
             self.collection["Cash"].last = self.collection["Cash"].entry
         else:
@@ -615,7 +630,8 @@ class AssetCollection:
                 self.collection[ticker] = existing[ticker]
                 
         self.df = pd.DataFrame(columns = ["id", "Ticker", "Quantity", "Entry", "Last", "Chg1D", "Chg1M", "Chg3M", "Momentum", "MomentumEmoji",
-                                          "Trend", "TrendEmoji", "LR", "TR", "RPos", "VolumeDesc", "MfrAction", "CATS", "Crowding_Text", "Monthly_Vol"])
+                                          "Trend", "TrendEmoji", "LR", "TR", "RPos", "VolumeDesc", "MfrAction", "CATS", "Crowding_Text",
+                                          "Stop", "Target"])
         
         self.df.loc["Cash"] = self.collection["Cash"].df_row
         

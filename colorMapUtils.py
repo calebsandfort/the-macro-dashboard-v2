@@ -13,6 +13,14 @@ custom_cmaps = {
     "Crowding" : {
         "hex_list": ["#0082c8", "#eef2f3", "#515A60"],
         "stop_list": [0, 0.2, 1]
+    },
+    "Stops" : {
+        "hex_list": ["#272727", "#68000D"],
+        "stop_list": [0, 1]
+    },
+    "Targets" : {
+        "hex_list": ["#272727", "#00441B"],
+        "stop_list": [0, 1]
     }}
 
 def get_cmap(name):

@@ -37,7 +37,9 @@ def refreshData():
 
 # refreshData()
 
-# portfolio = ac.AssetCollection("Portfolio.csv")
+# portfolio = ac.AssetCollection("Test.csv")
+
+# t = 5
 
 # asset = portfolio.collection["USO"]
 # t = asset.calcPositionSizeValues(portfolio.portfolio_value, 2.0)

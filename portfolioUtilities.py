@@ -481,12 +481,9 @@ def get_single_cmap_value(s, m, M, cmap='seismic', reverse = False, low=0, high=
                             M + (rng * high))
     normed = norm(s)
     
-    the_cmap = plt.cm.get_cmap(cmap).reversed() if reverse else plt.cm.get_cmap(cmap)
+    the_cmap = cmap_utils.get_cmap(cmap).reversed() if reverse else cmap_utils.get_cmap(cmap)
     
     c = [colors.rgb2hex(x) for x in the_cmap(normed)]
-    
-    # print("test")
-    # print(s[0], "    ", normed[0], "   ", c[0])
     
     return c
 

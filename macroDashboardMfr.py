@@ -128,7 +128,11 @@ def get_assets_data_table(name, assetCollection):
          format={"specifier": ".2%"}),
     dict(id='LR', name='LR', type='numeric',
          format={"specifier": "$.2f"}),
+    dict(id='Stop', name='Stop', type='numeric',
+         format={"specifier": "$.2f"}),
     dict(id='Last', name='Last', type='numeric',
+         format={"specifier": "$.2f"}),
+    dict(id='Target', name='Target', type='numeric',
          format={"specifier": "$.2f"}),
     dict(id='TR', name='TR', type='numeric',
          format={"specifier": "$.2f"}),
@@ -144,6 +148,8 @@ def get_assets_data_table(name, assetCollection):
     dict(id='Chg3M', name='3M', type='numeric',
          format={"specifier": ".2%"}),
     dict(id='Crowding_Text', name='Crowding', type='numeric'),
+    dict(id='Stop_Ratio', name='Stop_Ratio', type='numeric',
+         format={"specifier": ".2f"}),
     ])
 
 
@@ -313,15 +319,39 @@ def get_assets_data_table(name, assetCollection):
     
     styles.extend(portUtils.get_column_cmap_values(assetCollection.df, 'RPos', 0.0, 1.0, cmap='RdYlGn', reverse=False, low=0, high=0,
                                                    st_threshold_1=0.75, st_threshold_2=0.25, white_threshold_1=0.75, white_threshold_2=0.25))
-    
-    # styles.extend(portUtils.get_column_cmap_values(assetCollection.df, 'CATS', -100.0, 100.0, cmap='RdYlGn', reverse=False, low=0, high=0,
-    #                                                st_threshold_1=50.0, st_threshold_2=-50.0, white_threshold_1=50.0, white_threshold_2=-50.0))
+    for t in assetCollection.collection:
+        asset = assetCollection.collection[t]
+        if (asset.Stop > 0.0):
+            stopBgColor = portUtils.get_single_cmap_value([asset.Stop_Ratio], 0.0, 1.0, cmap='Stops')[0]
+
+            styles.append({
+                'if': {
+                    'filter_query': f'{{Ticker}} = "{asset.ticker}"',
+                    'column_id': 'Stop'
+                },
+                'backgroundColor': stopBgColor,
+                'color': '#c4cad4'
+            })
+            
+        if (asset.Target > 0.0):
+            targetBgColor = portUtils.get_single_cmap_value([asset.Target_Ratio], 0.0, 1.0, cmap='Targets')[0]
+
+            styles.append({
+                'if': {
+                    'filter_query': f'{{Ticker}} = "{asset.ticker}"',
+                    'column_id': 'Target'
+                },
+                'backgroundColor': targetBgColor,
+                'color': '#c4cad4'
+            })
+            
+
 
     styles.append({
         'if': {
             'filter_query': '{Ticker} = "Cash"',
             'column_id': ["PnL", "Chg1D", "Chg1M", "Chg3M", "TrendEmoji", "MomentumEmoji", "RPos", "VolumeDesc", "LR", "TR", "Last",
-                           "Crowding_Score", "Crowding_Text"
+                           "Crowding_Score", "Crowding_Text", "Stop", "Target"
                           ]
         },
         'color': 'transparent',
@@ -332,7 +362,7 @@ def get_assets_data_table(name, assetCollection):
         id="{}_assets_data_table".format(name.replace(" ", "_")),
         data=assetCollection.df.to_dict("records"),
         columns=columns,
-        # hidden_columns=['Chg1D_zs', 'Chg1W_zs', 'Chg1M_zs', 'Chg3M', 'Chg3M_zs'],
+        hidden_columns=['Stop_Ratio'],
         css=[{"selector": ".dash-spreadsheet-menu", "rule": "display: none"}],
         sort_action='native',
         style_header=data_table_style_header_dict,
@@ -702,8 +732,8 @@ def drawCandlestickChart(fig, df, isPercent, row, col, showLegend = True):
     fig.add_trace(go.Scatter(x=df.index.values, y=df["close"].shift(21),
                              showlegend=showLegend,
                              mode='lines',
-                             line=dict(color="#00c3ff", width=1),
-                             opacity = .5,
+                             line=dict(color="#00c3ff", width=2),
+                             opacity = .6,
                              name='1M Mtum',
                              legendgrouptitle_text="Main",
                              legendgroup="Main"), row=row, col=col)
@@ -750,6 +780,19 @@ def getCharts(asset, lookback):
     
     #Main Chart
     drawCandlestickChart(fig, df, isPercent, 1, 1)
+    
+    if asset.Stop > 0.0:
+        fig.add_trace(go.Scatter(x=df.index.values, y=df["stop"],
+                                  mode='lines',
+                                  line=dict(color=chartSolidRed, width=2, dash = "dash"),
+                                  name='Stop',
+                                  legendgroup="Main"), row=1, col=1)
+        
+        fig.add_trace(go.Scatter(x=df.index.values, y=df["target"],
+                                  mode='lines',
+                                  line=dict(color=chartSolidGreen, width=2, dash = "dash"),
+                                  name='Target',
+                                  legendgroup="Main"), row=1, col=1)
     
     #%% Volume Chart
     if not noVolume:
@@ -928,22 +971,33 @@ def getAssetStats(asset):
                                                    st_threshold_1=0.75, st_threshold_2=0.25, white_threshold_1=0.75, white_threshold_2=0.25)),
                     html.Td("Last", style=tdLabelStyles), html.Td(f"{asset.last/100.0:.2%}" if isPercent else f"${asset.last:.2f}")])
     
+    stopStyle = {}
+    if asset.Stop > 0.0:
+        stopStyle["backgroundColor"] = portUtils.get_single_cmap_value([asset.Stop_Ratio], 0.0, 1.0, cmap='Stops')[0]
+    
+    targetStyle = {}
+    if asset.Target > 0.0:
+        targetStyle["backgroundColor"] = portUtils.get_single_cmap_value([asset.Target_Ratio], 0.0, 1.0, cmap='Targets')[0]
+    
+    stopAndTarget = html.Tr([html.Td("Stop", style=tdLabelStyles), html.Td(f"${asset.Stop:.2f}", style = stopStyle),
+                    html.Td("Target", style=tdLabelStyles), html.Td(f"${asset.Target:.2f}", style = targetStyle)])
+    
     trendAndMomentum = html.Tr([html.Td("Trend", style=tdLabelStyles), html.Td(asset.TrendEmoji),
                     html.Td("Momentum", style=tdLabelStyles), html.Td(asset.MomentumEmoji)])
     
     lrAndTr = html.Tr([html.Td("LR", style=tdLabelStyles), html.Td(f"{asset.LR/100.0:.2%}" if isPercent else f"${asset.LR:.2f}"),
                     html.Td("TR", style=tdLabelStyles), html.Td(f"{asset.TR/100.0:.2%}" if isPercent else f"${asset.TR:.2f}")])
     
-    mfrAction = html.Tr([html.Td("MFR Action", style=tdLabelStyles), html.Td(asset.MfrAction),
+    volumeAndCrowding = html.Tr([html.Td("Volume", style=tdLabelStyles), html.Td(asset.VolumeDesc, style = portUtils.getVolumeStyle(asset)),
                     html.Td("Crowding", style=tdLabelStyles), html.Td(asset.Crowding_Text, style = {"color": asset.Crowding_TextColor, "backgroundColor": asset.Crowding_Color})])
     
-    volumeAndChg1D = html.Tr([html.Td("Volume", style=tdLabelStyles), html.Td(asset.VolumeDesc, style = portUtils.getVolumeStyle(asset)),
-                    html.Td("Chg 1D", style=tdLabelStyles), html.Td(f"{asset.Chg1D:.2%}", style = {"color": greenColor if asset.Chg1D > 0.0 else redColor})])
+    volumeAndChg1D = html.Tr([html.Td("Chg 1D", style=tdLabelStyles), html.Td(f"{asset.Chg1D:.2%}", style = {"color": greenColor if asset.Chg1D > 0.0 else redColor}),
+                              html.Td("Chg 1M", style=tdLabelStyles), html.Td(f"{asset.Chg1M:.2%}", style = {"color": greenColor if asset.Chg1M > 0.0 else redColor})])
     
-    chg1MAndChg3M = html.Tr([html.Td("Chg 1M", style=tdLabelStyles), html.Td(f"{asset.Chg1M:.2%}", style = {"color": greenColor if asset.Chg1M > 0.0 else redColor}),
-                    html.Td("Chg 3M", style=tdLabelStyles), html.Td(f"{asset.Chg3M:.2%}", style = {"color": greenColor if asset.Chg3M > 0.0 else redColor})])
+    chg1MAndChg3M = html.Tr([html.Td("Chg 3M", style=tdLabelStyles), html.Td(f"{asset.Chg3M:.2%}", style = {"color": greenColor if asset.Chg3M > 0.0 else redColor}),
+                             html.Td("", style=tdLabelStyles), html.Td("")])
     
-    table_body = [html.Tbody([weightAndPnL, lrAndTr, rPosAndLast, trendAndMomentum, mfrAction, volumeAndChg1D, chg1MAndChg3M])]
+    table_body = [html.Tbody([weightAndPnL, rPosAndLast, stopAndTarget, lrAndTr, trendAndMomentum, volumeAndCrowding, volumeAndChg1D, chg1MAndChg3M])]
     
     table = dbc.Table(table_header + table_body, bordered=False, id="asset_stats_table", className = "white_table compact_table")
     
@@ -961,7 +1015,7 @@ def getMiniChartTabs(asset):
         [
             dbc.Tab(asset_crowding_tab_content, tab_id="crowding_tab", label="Crowding"),
             dbc.Tab(correlation_tab_content, tab_id="correlations_tab", label="Correlations"),
-            dbc.Tab(asset_recent_changes_tab_content, tab_id="asset_recent_changes_tab", label="Position Mgmt Calc", ),
+            dbc.Tab(asset_recent_changes_tab_content, tab_id="asset_recent_changes_tab", label="Recent Changes", ),
         ],
         active_tab="crowding_tab"
     )
@@ -990,13 +1044,15 @@ def getPositionMgmtCalc(asset):
         children=[dbc.Row(
             [
                 dbc.Col(dbc.Label(
-                    "Direction", html_for="uxDropdown_direction"), width=3, className="pt-2 font-weight-bold"),
-                dbc.Col(dbc.Select(id="uxDropdown_direction",
-                                   options=[
-                                       {"label": "Long", "value": "Long"},
-                                       {"label": "Short", "value": "Short"},
-                                   ], value="Long",
-                                   ), width=3),
+                    "Vol Lookback (Years)", html_for="uxInput_Years"), width=3, className="pt-2 font-weight-bold"),
+                dbc.Col(
+                    dcc.Input(
+                        id="uxInput_Years",
+                        type="number",
+                        min=.25, max=20.0, step=.25, value=3,
+                        className="mt-1 w-100"
+                    ), width=3
+                ),
                 dbc.Col(dbc.Label("Max Loss"), width=3, className="pt-2 font-weight-bold"),
                 dbc.Col(
                     dcc.Input(
@@ -1012,7 +1068,32 @@ def getPositionMgmtCalc(asset):
         ),
             dbc.Row(
                 [
-                    dbc.Col(getPositionMgmtTable(asset, "Long", 2.0), width=12, id="uxCol_PositionMgmtTable")
+                    dbc.Col(dbc.Label(
+                        "Stop Loss Sigma", html_for="uxInput_StopLossSigma"), width=3, className="pt-2 font-weight-bold"),
+                    dbc.Col(
+                        dcc.Input(
+                            id="uxInput_StopLossSigma",
+                            type="number",
+                            min=.25, max=5.0, step=.25, value=1.5,
+                            className="mt-1 w-100"
+                        ), width=3
+                    ),
+                    dbc.Col(dbc.Label("Profit Target Sigma", html_for="uxInput_ProfitTargetSigma"), width=3, className="pt-2 font-weight-bold"),
+                    dbc.Col(
+                        dcc.Input(
+                            id="uxInput_ProfitTargetSigma",
+                            type="number",
+                            min=.25, max=5.0, step=.25, value=2.25,
+                            className="mt-1 w-100"
+                        ), width=3
+                    ),
+                    # dbc.Col(dbc.Button("Update", color="primary", id="uxButton_position_mgmt_calc", n_clicks=0), width = 2),
+                ],
+                className="g-2",
+            ),
+            dbc.Row(
+                [
+                    dbc.Col(getPositionMgmtTable(asset, 3.0, 2.0, 1.5, 2.25), width=12, id="uxCol_PositionMgmtTable")
 
                 ],
                 className="g-2",
@@ -1024,8 +1105,8 @@ def getPositionMgmtCalc(asset):
 
     return form
 
-def getPositionMgmtTable(asset, direction, max_loss):
-    values = asset.calcPositionSizeValues(portfolio.portfolio_value, max_loss)
+def getPositionMgmtTable(asset, years, max_loss, stop_loss_sigma, profit_target_sigma):
+    values = asset.calcPositionSizeValues(portfolio.portfolio_value, years, max_loss, stop_loss_sigma, profit_target_sigma)
     
     rows = []
     
@@ -1045,41 +1126,41 @@ def getPositionMgmtTable(asset, direction, max_loss):
                         html.Td(f"${values['current_price']:,.2f}"),
                         html.Td(f"${values['notional_value']:,.2f}")]))
     
-    if direction == "Long":
-        rows.append(html.Tr([html.Td("Stop Price", className="font-weight-bold"),
-                            html.Td("Current Price", className="font-weight-bold"),
-                            html.Td("Target Price", className="font-weight-bold")]))
+    # if direction == "Long":
+    rows.append(html.Tr([html.Td("Stop Price", className="font-weight-bold", style = {"backgroundColor": redColor}),
+                        html.Td("Current Price", className="font-weight-bold"),
+                        html.Td("Target Price", className="font-weight-bold", style = {"backgroundColor": greenColor})]))
+    
+    rows.append(html.Tr([html.Td(f"${values['long_stop_loss_value']:,.2f}"),
+                        html.Td(f"${values['current_price']:,.2f}"),
+                        html.Td(f"${values['long_profit_target_value']:,.2f}")]))
+    # else:
+    #     rows.append(html.Tr([html.Td("Target Price", className="font-weight-bold", style = {"backgroundColor": greenColor}),
+    #                         html.Td("Current Price", className="font-weight-bold"),
+    #                         html.Td("Stop Price", className="font-weight-bold", style = {"backgroundColor": redColor})
+    #                         ]))
         
-        rows.append(html.Tr([html.Td(f"${values['long_stop_loss_value']:,.2f}"),
-                            html.Td(f"${values['current_price']:,.2f}"),
-                            html.Td(f"${values['long_profit_target_value']:,.2f}")]))
-    else:
-        rows.append(html.Tr([html.Td("Target Price", className="font-weight-bold"),
-                            html.Td("Current Price", className="font-weight-bold"),
-                            html.Td("Stop Price", className="font-weight-bold")
-                            ]))
+    #     rows.append(html.Tr([html.Td(f"${values['short_profit_target_value']:,.2f}"),
+    #                         html.Td(f"${values['current_price']:,.2f}"),
+    #                         html.Td(f"${values['short_stop_loss_value']:,.2f}")]))
         
-        rows.append(html.Tr([html.Td(f"${values['short_profit_target_value']:,.2f}"),
-                            html.Td(f"${values['current_price']:,.2f}"),
-                            html.Td(f"${values['short_stop_loss_value']:,.2f}")]))
+    # if direction == "Long":
+    rows.append(html.Tr([html.Td("Stop Ptg", className="font-weight-bold"),
+                        html.Td(""),
+                        html.Td("Target Ptg", className="font-weight-bold")]))
+    
+    rows.append(html.Tr([html.Td(f"{values['stop_loss_ptg']:.2%}"),
+                        html.Td(""),
+                        html.Td(f"{values['profit_target_ptg']:.2%}")]))
+    # else:
+    #     rows.append(html.Tr([html.Td("Target Ptg", className="font-weight-bold"),
+    #                         html.Td(""),
+    #                         html.Td("Stop Ptg", className="font-weight-bold")
+    #                         ]))
         
-    if direction == "Long":
-        rows.append(html.Tr([html.Td("Stop Ptg", className="font-weight-bold"),
-                            html.Td(""),
-                            html.Td("Target Ptg", className="font-weight-bold")]))
-        
-        rows.append(html.Tr([html.Td(f"{values['stop_loss_ptg']:.2%}"),
-                            html.Td(""),
-                            html.Td(f"{values['profit_target_ptg']:.2%}")]))
-    else:
-        rows.append(html.Tr([html.Td("Target Ptg", className="font-weight-bold"),
-                            html.Td(""),
-                            html.Td("Stop Ptg", className="font-weight-bold")
-                            ]))
-        
-        rows.append(html.Tr([html.Td(f"{values['profit_target_ptg']:.2%}"),
-                            html.Td(""),
-                            html.Td(f"{values['stop_loss_ptg']:.2%}")]))
+    #     rows.append(html.Tr([html.Td(f"{values['profit_target_ptg']:.2%}"),
+    #                         html.Td(""),
+    #                         html.Td(f"{values['stop_loss_ptg']:.2%}")]))
     
     table_body = [html.Tbody(rows)]
     
@@ -1226,7 +1307,7 @@ def getAssetCrowdingChart(asset):
         # fig.layout.annotations[0].update(x=0.065)
         # fig.layout.annotations[0].update(y=1.99)
         
-        fig.update_layout(height=350)
+        fig.update_layout(height=320)
         
         
         content = dcc.Graph(figure=fig)
@@ -1507,12 +1588,12 @@ app.layout = html.Div(
 
 @app.callback(
     (Output("uxCol_PositionMgmtTable", "children")),
-    [Input('uxDropdown_direction', 'value'), Input('uxInput_MaxLoss', 'value')],
+    [Input('uxInput_Years', 'value'), Input('uxInput_MaxLoss', 'value'), Input('uxInput_StopLossSigma', 'value'), Input('uxInput_ProfitTargetSigma', 'value')],
     (State("uxHidden_PositionMgmtCalc_Ticker", "value"))
     )
-def update_position_mgmt_calc(direction, maxLoss, ticker):
+def update_position_mgmt_calc(years, maxLoss, stop_loss_sigma, profit_target_sigma, ticker):
 
-    return getPositionMgmtTable(allAssets[ticker], direction, maxLoss)
+    return getPositionMgmtTable(allAssets[ticker], years, maxLoss, stop_loss_sigma, profit_target_sigma)
 
 @app.callback(
     Output('correlation_chart_wrapper', 'children'),
