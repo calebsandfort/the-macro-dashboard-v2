@@ -28,6 +28,19 @@ def refreshData():
     
     allTickers.extend(x for x in temp.index.values if x not in allTickers and x != 'Cash' and x != 'SDBA Cash')
     
+    with open(os.path.join(os.getcwd(), 'portfolios', "Benchmarks.txt")) as f:
+        data = f.read()
+
+    benchmarksDict = json.loads(data)
+    benchmarkTickers = []
+    
+    for benchmark in benchmarksDict:
+        for ticker in benchmarksDict[benchmark]["Tickers"]:
+            if ticker not in benchmarkTickers:
+                benchmarkTickers.append(ticker)
+    
+    allTickers.extend(x for x in benchmarkTickers if x not in allTickers)
+    
     startDate = datetime.datetime.strptime('2016-05-01', '%Y-%m-%d')
     endDate = datetime.datetime.today()
     
@@ -37,7 +50,7 @@ def refreshData():
 
 # refreshData()
 
-# portfolio = ac.AssetCollection("Test.csv")
+#portfolio = ac.AssetCollection("Test.csv")
 
 # t = 5
 

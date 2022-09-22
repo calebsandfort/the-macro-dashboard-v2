@@ -15,12 +15,12 @@ custom_cmaps = {
         "stop_list": [0, 0.2, 1]
     },
     "Stops" : {
-        "hex_list": ["#272727", "#68000D"],
-        "stop_list": [0, 1]
+        "hex_list": ["#272727", "#4E0502", "#F00000"],
+        "stop_list": [0, .5, 1]
     },
     "Targets" : {
-        "hex_list": ["#272727", "#00441B"],
-        "stop_list": [0, 1]
+        "hex_list": ["#272727", "#052E05", "#0f9b0f"],
+        "stop_list": [0, .5, 1]
     }}
 
 def get_cmap(name):

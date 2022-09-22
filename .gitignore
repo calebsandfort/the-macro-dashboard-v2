@@ -3,6 +3,7 @@ data/*
 
 portfolios/*
 !portfolios/Portfolio.Sample.csv
+!portfolios/PerformanceData.Sample.csv
 !portfolios/MarketSnapshot.csv
 !portfolios/Potentials.csv
 

@@ -69,6 +69,12 @@ def GetTdaData(ticker, periodType, frequencyType, frequency, startDate, endDate,
             yahooTicker = ac.tickerLookup[ticker]["yahoo"]
         
         ticker = ac.tickerLookup[ticker]["tda"]
+    elif ((ticker.startswith("GE")) and (ticker.endswith(".CME"))):
+        isYahooData = True
+        yahooTicker = ticker
+    elif ((ticker.startswith("CL")) and (ticker.endswith(".NYM"))):
+        isYahooData = True
+        yahooTicker = ticker
     
     file_path = "data/{0}.csv".format(ticker);
     
@@ -206,7 +212,7 @@ def GetAlphaQueryVolData(ticker):
        
     df["skew"] = np.nan
     
-    skew_endpoint = 'https://www.alphaquery.com/data/option-statistic-chart?ticker={ticker}&perType=90-Day&identifier=iv-mean-skew'
+    skew_endpoint = 'https://www.alphaquery.com/data/option-statistic-chart?ticker={ticker}&perType=60-Day&identifier=iv-mean-skew'
     
     skew_url = skew_endpoint.format(ticker=ticker)
     
@@ -295,6 +301,8 @@ def GetDataFromCsv(tickers, getVolData = False):
         
         file_path = "data/{0}.csv".format(tda_ticker);
         price_data[ticker] = pd.read_csv(file_path, index_col="datetime", parse_dates=True)
+        
+        price_data[ticker] = price_data[ticker].set_index(pd.to_datetime(price_data[ticker].index))
         
         if (getVolData and exists("data/{0}.Vol.csv".format(ticker))):
             file_path = "data/{0}.Vol.csv".format(ticker);
@@ -396,3 +404,4 @@ def getOneMillionActiveAddresses(arr):
 
 
 # cbf01b35-7ba0-4eda-a2b3-74d2ac0f88f8
+

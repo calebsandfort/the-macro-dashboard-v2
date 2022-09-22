@@ -21,6 +21,10 @@ from scipy.stats import pearsonr
 import numpy as np
 import argparse
 import helper
+import performance as perf
+import plotly.express as px
+from itertools import cycle
+import eurodollarCurveHelper as edch
 
 parser = argparse.ArgumentParser()
 
@@ -73,6 +77,8 @@ chartTransNeutralDanger = 'rgba(49,77,102,0.2)'
 
 amc = ac.getAllRangeChanges(args.generic_ranges)
 
+eurodollarCurveDf = edch.constructCurve(args.refresh)
+
 def extendAllAssets(collection):
     for ticker in collection:
         if ticker not in allAssets:
@@ -84,12 +90,15 @@ print("marketSnapshot")
 marketSnapshot = ac.AssetCollection("MarketSnapshot.csv", args.generic_ranges, generic_ranges = args.generic_ranges)
 print("potentials")
 potentials = ac.AssetCollection("Potentials.csv", args.generic_ranges, generic_ranges = args.generic_ranges)
+print("benchmarks")
+benchmarks = ac.AssetCollection("Benchmarks.txt", args.generic_ranges, generic_ranges = args.generic_ranges)
 
 allAssets = {}
 
 extendAllAssets(portfolio.collection)
 extendAllAssets(marketSnapshot.collection)
 extendAllAssets(potentials.collection)
+extendAllAssets(benchmarks.collection)
 
 watchlistDict = {}
 watchlistDict["Cash"] = ac.Asset("Cash", 1, 1000000000.0)
@@ -102,10 +111,13 @@ for ticker in allAssets:
 print("watchlist")
 watchlist = ac.AssetCollection(None, watchlistDict, isPortfolio = False, generic_ranges = args.generic_ranges)
 
+print("peformance")
+performanceDict = perf.getPortfolioAndBenchmarksPerformanceDict()
+
 print("done")
 
-equityTickers = ["SPY", "QQQ", "IWM", "VIX"]
-bondTickers = ["US10Y", "US30Y", "TLT", "HYG", "LQD"]
+equityTickers = ["SPY", "QQQ", "IWM", "VIX", "UVXY"]
+bondTickers = ["MOVE", "US10Y", "US30Y", "TLT", "HYG", "LQD"]
 
 def get_assets_data_table(name, assetCollection):
     columns = [
@@ -124,16 +136,20 @@ def get_assets_data_table(name, assetCollection):
     columns.extend([
     dict(id='Weight', name='Weight', type='numeric',
          format={"specifier": ".2%"}),
+    # dict(id='VaR', name='VaR', type='numeric',
+    #      format={"specifier": ".2%"}),
     dict(id='PnL', name='PnL', type='numeric',
+         format={"specifier": ".2%"}),
+    dict(id='PortPnL', name='Port PnL', type='numeric',
          format={"specifier": ".2%"}),
     dict(id='LR', name='LR', type='numeric',
          format={"specifier": "$.2f"}),
-    dict(id='Stop', name='Stop', type='numeric',
-         format={"specifier": "$.2f"}),
+    # dict(id='Stop', name='Stop', type='numeric',
+    #      format={"specifier": "$.2f"}),
     dict(id='Last', name='Last', type='numeric',
          format={"specifier": "$.2f"}),
-    dict(id='Target', name='Target', type='numeric',
-         format={"specifier": "$.2f"}),
+    # dict(id='Target', name='Target', type='numeric',
+    #      format={"specifier": "$.2f"}),
     dict(id='TR', name='TR', type='numeric',
          format={"specifier": "$.2f"}),
     dict(id='RPos', name='R Pos', type='numeric',
@@ -175,6 +191,20 @@ def get_assets_data_table(name, assetCollection):
             'if': {
                 'filter_query': '{PnL} < 0',
                 'column_id': 'PnL'
+            },
+            'color': redColor
+        },
+        {
+            'if': {
+                'filter_query': '{PortPnL} > 0',
+                'column_id': 'PortPnL'
+            },
+            'color': greenColor
+        },
+        {
+            'if': {
+                'filter_query': '{PortPnL} < 0',
+                'column_id': 'PortPnL'
             },
             'color': redColor
         },
@@ -297,12 +327,20 @@ def get_assets_data_table(name, assetCollection):
                 'filter_query': '{Crowding_Text} = "Trim Longs"',
                 'column_id': 'Crowding_Text'
             },
-            'backgroundColor': "#73C476",
+            'backgroundColor': "#FCBCA2",
             'color': '#272727'
         },
         {
             'if': {
-                'filter_query': '{Crowding_Text} = "Correction"',
+                'filter_query': '{Crowding_Text} = "Get Long"',
+                'column_id': 'Crowding_Text'
+            },
+            'backgroundColor': "#228A44",
+            'color': 'white'
+        },
+        {
+            'if': {
+                'filter_query': '{Crowding_Text} = "Puke"',
                 'column_id': 'Crowding_Text'
             },
             'backgroundColor': "#67000D",
@@ -313,45 +351,80 @@ def get_assets_data_table(name, assetCollection):
                 'filter_query': '{Crowding_Text} = "Trim Shorts"',
                 'column_id': 'Crowding_Text'
             },
-            'backgroundColor': "#FB6B4B",
+            'backgroundColor': "#C7E9C0",
             'color': '#272727'
+        },
+        {
+            'if': {
+                'filter_query': '{Crowding_Text} = "Get Short"',
+                'column_id': 'Crowding_Text'
+            },
+            'backgroundColor': "#CB181D",
+            'color': 'white'
         }])
     
     styles.extend(portUtils.get_column_cmap_values(assetCollection.df, 'RPos', 0.0, 1.0, cmap='RdYlGn', reverse=False, low=0, high=0,
                                                    st_threshold_1=0.75, st_threshold_2=0.25, white_threshold_1=0.75, white_threshold_2=0.25))
-    for t in assetCollection.collection:
-        asset = assetCollection.collection[t]
-        if (asset.Stop > 0.0):
-            stopBgColor = portUtils.get_single_cmap_value([asset.Stop_Ratio], 0.0, 1.0, cmap='Stops')[0]
+    # for t in assetCollection.collection:
+    #     asset = assetCollection.collection[t]
+    #     if (asset.Stop > 0.0):
+    #         stopBgColor = portUtils.get_single_cmap_value([asset.Stop_Ratio], 0.0, 1.0, cmap='Stops')[0]
 
-            styles.append({
-                'if': {
-                    'filter_query': f'{{Ticker}} = "{asset.ticker}"',
-                    'column_id': 'Stop'
-                },
-                'backgroundColor': stopBgColor,
-                'color': '#c4cad4'
-            })
+    #         styles.append({
+    #             'if': {
+    #                 'filter_query': f'{{Ticker}} = "{asset.ticker}"',
+    #                 'column_id': 'Stop'
+    #             },
+    #             'backgroundColor': stopBgColor,
+    #             'color': '#c4cad4'
+    #         })
             
-        if (asset.Target > 0.0):
-            targetBgColor = portUtils.get_single_cmap_value([asset.Target_Ratio], 0.0, 1.0, cmap='Targets')[0]
+    #     if (asset.Target > 0.0):
+    #         targetBgColor = portUtils.get_single_cmap_value([asset.Target_Ratio], 0.0, 1.0, cmap='Targets')[0]
 
-            styles.append({
-                'if': {
-                    'filter_query': f'{{Ticker}} = "{asset.ticker}"',
-                    'column_id': 'Target'
-                },
-                'backgroundColor': targetBgColor,
-                'color': '#c4cad4'
-            })
+    #         styles.append({
+    #             'if': {
+    #                 'filter_query': f'{{Ticker}} = "{asset.ticker}"',
+    #                 'column_id': 'Target'
+    #             },
+    #             'backgroundColor': targetBgColor,
+    #             'color': '#c4cad4'
+    #         })
             
-
+    # styles.append({
+    #     'if': {
+    #         'filter_query': '{Stop} > {Last}',
+    #         'column_id': 'Stop'
+    #     },
+    #     'fontWeight': "bolder",
+    #     'color': '#272727'
+    # })
+    
+    # styles.append({
+    #     'if': {
+    #         'filter_query': '{Target} < {Last}',
+    #         'column_id': 'Target'
+    #     },
+    #     'fontWeight': "bolder",
+    #     'color': '#272727'
+    # })
 
     styles.append({
         'if': {
             'filter_query': '{Ticker} = "Cash"',
             'column_id': ["PnL", "Chg1D", "Chg1M", "Chg3M", "TrendEmoji", "MomentumEmoji", "RPos", "VolumeDesc", "LR", "TR", "Last",
-                           "Crowding_Score", "Crowding_Text", "Stop", "Target"
+                           "Crowding_Score", "Crowding_Text", "Stop", "Target", "VaR", "PortPnL",
+                          ]
+        },
+        'color': 'transparent',
+        'backgroundColor': 'rgb(39, 39, 39)'
+    })
+    
+    styles.append({
+        'if': {
+            'filter_query': '{Ticker} = "Footer"',
+            'column_id': ["Ticker", "PnL", "Chg1D", "Chg1M", "Chg3M", "TrendEmoji", "MomentumEmoji", "RPos", "VolumeDesc", "LR", "TR", "Last",
+                           "Crowding_Score", "Crowding_Text", "Stop", "Target", "Weight",
                           ]
         },
         'color': 'transparent',
@@ -574,9 +647,11 @@ def addCrowding(fig, df, name, row, col):
     
     crowding_colors = {
         "Squeeze": "#00441B",
-        "Trim Longs": "#73C476",
-        "Trim Shorts": "#67000D",
-        "Correction": "#FB6B4B"
+        "Trim Longs": "#FCBCA2",
+        "Trim Shorts": "#C7E9C0",
+        "Puke": "#67000D",
+        "Get Long": "#228A44",
+        "Get Short": "#CB181D",
         }
 
     fig.add_trace(go.Bar(x=crowding.index.values, y=crowding["crowding_score"],
@@ -918,8 +993,10 @@ def getCharts(asset, lookback):
     # ), row=crowding_row, col=1)
     
     addCrowding(fig, df, "Trim Shorts", crowding_row, 1)
-    addCrowding(fig, df, "Correction", crowding_row, 1)
+    addCrowding(fig, df, "Get Short", crowding_row, 1)
+    addCrowding(fig, df, "Puke", crowding_row, 1)
     addCrowding(fig, df, "Trim Longs", crowding_row, 1)
+    addCrowding(fig, df, "Get Long", crowding_row, 1)
     addCrowding(fig, df, "Squeeze", crowding_row, 1)
     
     
@@ -964,8 +1041,11 @@ def getAssetStats(asset):
         if "isPercent" in ac.tickerLookup[asset.ticker]:
             isPercent = True
 
-    weightAndPnL = html.Tr([html.Td("Weight", style=tdLabelStyles), html.Td(f"{asset.Weight:.2%}"),
-                    html.Td("PnL", style=tdLabelStyles), html.Td(f"{asset.PnL:.2%}", style = {"color": greenColor if asset.PnL > 0.0 else redColor})])
+    weight = asset.Weight[0] if isinstance(asset.Weight,np.ndarray) else asset.Weight
+    pnl = asset.PnL[0] if isinstance(asset.PnL,np.ndarray) else asset.PnL
+
+    weightAndPnL = html.Tr([html.Td("Weight", style=tdLabelStyles), html.Td(f"{weight:.2%}"),
+                    html.Td("PnL", style=tdLabelStyles), html.Td(f"{pnl:.2%}", style = {"color": greenColor if pnl > 0.0 else redColor})])
     
     rPosAndLast = html.Tr([html.Td("R Pos", style=tdLabelStyles), html.Td(f"{asset.RPos:.2f}", style = portUtils.get_single_cmap_style(asset.RPos, 0.0, 1.0, cmap='RdYlGn', reverse=False, low=0, high=0,
                                                    st_threshold_1=0.75, st_threshold_2=0.25, white_threshold_1=0.75, white_threshold_2=0.25)),
@@ -979,8 +1059,8 @@ def getAssetStats(asset):
     if asset.Target > 0.0:
         targetStyle["backgroundColor"] = portUtils.get_single_cmap_value([asset.Target_Ratio], 0.0, 1.0, cmap='Targets')[0]
     
-    stopAndTarget = html.Tr([html.Td("Stop", style=tdLabelStyles), html.Td(f"${asset.Stop:.2f}", style = stopStyle),
-                    html.Td("Target", style=tdLabelStyles), html.Td(f"${asset.Target:.2f}", style = targetStyle)])
+    # stopAndTarget = html.Tr([html.Td("Stop", style=tdLabelStyles), html.Td(f"${asset.Stop:.2f}", style = stopStyle),
+    #                 html.Td("Target", style=tdLabelStyles), html.Td(f"${asset.Target:.2f}", style = targetStyle)])
     
     trendAndMomentum = html.Tr([html.Td("Trend", style=tdLabelStyles), html.Td(asset.TrendEmoji),
                     html.Td("Momentum", style=tdLabelStyles), html.Td(asset.MomentumEmoji)])
@@ -997,7 +1077,9 @@ def getAssetStats(asset):
     chg1MAndChg3M = html.Tr([html.Td("Chg 3M", style=tdLabelStyles), html.Td(f"{asset.Chg3M:.2%}", style = {"color": greenColor if asset.Chg3M > 0.0 else redColor}),
                              html.Td("", style=tdLabelStyles), html.Td("")])
     
-    table_body = [html.Tbody([weightAndPnL, rPosAndLast, stopAndTarget, lrAndTr, trendAndMomentum, volumeAndCrowding, volumeAndChg1D, chg1MAndChg3M])]
+    table_body = [html.Tbody([weightAndPnL, rPosAndLast,
+                              # stopAndTarget,
+                              lrAndTr, trendAndMomentum, volumeAndCrowding, volumeAndChg1D, chg1MAndChg3M])]
     
     table = dbc.Table(table_header + table_body, bordered=False, id="asset_stats_table", className = "white_table compact_table")
     
@@ -1058,7 +1140,7 @@ def getPositionMgmtCalc(asset):
                     dcc.Input(
                         id="uxInput_MaxLoss",
                         type="number",
-                        min=.25, max=5.0, step=.25, value=2.0,
+                        min=.25, max=10.0, step=.25, value=2.0,
                         className="mt-1 w-100"
                     ), width=3
                 ),
@@ -1074,7 +1156,7 @@ def getPositionMgmtCalc(asset):
                         dcc.Input(
                             id="uxInput_StopLossSigma",
                             type="number",
-                            min=.25, max=5.0, step=.25, value=1.5,
+                            min=.25, max=10.0, step=.25, value=1.5,
                             className="mt-1 w-100"
                         ), width=3
                     ),
@@ -1083,7 +1165,7 @@ def getPositionMgmtCalc(asset):
                         dcc.Input(
                             id="uxInput_ProfitTargetSigma",
                             type="number",
-                            min=.25, max=5.0, step=.25, value=2.25,
+                            min=.25, max=10.0, step=.25, value=2.25,
                             className="mt-1 w-100"
                         ), width=3
                     ),
@@ -1382,7 +1464,8 @@ def getCorrelationContent(asset):
         
         index += 1
     
-    rows.append(html.Tr(html.Td(getCorrelationChart(allAssets[maxCorrTicker]), id="correlation_chart_wrapper", colSpan = 8)))
+    if maxCorrTicker in allAssets:
+        rows.append(html.Tr(html.Td(getCorrelationChart(allAssets[maxCorrTicker]), id="correlation_chart_wrapper", colSpan = 8)))
     
     table_body = [html.Tbody(rows)]
     
@@ -1520,6 +1603,285 @@ def getAssetModalContent(asset):
     
     return content
 
+def getPerformanceChartTable(statistic, display_name, header_class, multiplier = 1.0, isPercent = False, lookback = 0):
+    table_header = [
+        html.Thead(html.Tr([html.Th(display_name, className=f"{header_class} font-weight-bolder text-center h5")]))
+    ]
+    
+    layout = {
+            "template": "plotly_dark",
+            "xaxis_rangeslider_visible": False,
+            "margin": {"r": 10, "t": 10, "l": 10, "b": 10},
+            "legend": {"x": 0.35, "y": 1.2, "orientation": "h"}
+        }
+        
+    layout_fig = go.Figure(layout=layout)
+    
+    fig = make_subplots(rows=1, cols=1, row_heights = [1.0], figure = layout_fig,
+                        # subplot_titles=subplot_titles,
+                        vertical_spacing=0.05)
+    
+    fig.update_yaxes({
+                "title": {"standoff": 25},
+                "tickformat": ".2f",
+                "side": "right",
+                "tickprefix": "      " if isPercent else "      ",
+                "ticksuffix": "%" if isPercent else ""
+            }, row=1, col=1)
+    
+    x_values = performanceDict["Portfolio"].index.values[-lookback:] if lookback != 0 else performanceDict["Portfolio"].index.values
+    
+    palette = cycle(px.colors.qualitative.D3)
+    
+    addPerformanceTrace(fig, x_values, "Portfolio", statistic, multiplier, next(palette), lookback)
+    
+    for key in performanceDict:
+        if key != "Portfolio":
+            addPerformanceTrace(fig, x_values, key, statistic, multiplier, next(palette), lookback)
+    
+    fig.update_layout(height=295)
+    
+    chart = dcc.Graph(figure=fig)
+    
+    chart_row = html.Tr([html.Td(chart, style=tdLabelStyles)])
+    
+    table_body = [html.Tbody([chart_row])]
+    
+    table = dbc.Table(table_header + table_body, bordered=False, className = "white_table compact_table p-0")
+    
+    return table
+
+def addPerformanceTrace(fig, x_values, key, statistic, multiplier, color, lookback):
+    
+    fig.add_trace(go.Scatter(x=x_values, y=(performanceDict[key][statistic][-lookback:] if lookback != 0 else performanceDict[key][statistic]) * multiplier,
+                              mode='lines',
+                              line=dict(width=2, color = color),
+                              showlegend = True,
+                              name=key), row=1, col=1)
+    
+    
+def getPerformanceStatsTable():
+    table_header = [
+        html.Thead(html.Tr([html.Th("Stats", colSpan = 4, className="bg-primary font-weight-bolder text-center h5")]))
+    ]
+    
+    portfolio_stats = perf.getPerformanceStatsDict(performanceDict["Portfolio"])
+    
+    valueAndPeakEquity = html.Tr([html.Td("Value", style=tdLabelStyles), html.Td(f"${portfolio_stats['Value']:,.2f}"),
+                    html.Td("Peak Equity", style=tdLabelStyles), html.Td(f"${portfolio_stats['PeakEquity']:,.2f}")])
+    
+    pnLAndAvgDailyPnl = html.Tr([html.Td("PnL", style=tdLabelStyles), html.Td(f"{portfolio_stats['PnL']:.2%}"),
+                    html.Td("Avg Daily PnL", style=tdLabelStyles), html.Td(f"{portfolio_stats['AvgDailyPnL']:.2%}")])
+    
+    currentDDAndMaxDD = html.Tr([html.Td("Current Drawdown", style=tdLabelStyles), html.Td(f"{portfolio_stats['CurrentDrawdown']:.2%}"),
+                    html.Td("Max Drawdown", style=tdLabelStyles), html.Td(f"{portfolio_stats['MaxDrawdown']:.2%}")])
+    
+    sharpeRatioAndSortinoRatio = html.Tr([html.Td("Sharpe Ratio", style=tdLabelStyles), html.Td(f"{portfolio_stats['SharpeRatio']:.2f}"),
+                    html.Td("Sortino Ratio", style=tdLabelStyles), html.Td(f"{portfolio_stats['SortinoRatio']:.2f}")])
+    
+    calmarRatioAndGainPainRatio = html.Tr([html.Td("Calmar Ratio", style=tdLabelStyles), html.Td(f"{portfolio_stats['CalmarRatio']:.2f}"),
+                    html.Td("Gain/Pain Ratio", style=tdLabelStyles), html.Td(f"{portfolio_stats['GainPainRatio']:.2f}")])
+    
+    table_body = [html.Tbody([valueAndPeakEquity, pnLAndAvgDailyPnl, currentDDAndMaxDD, sharpeRatioAndSortinoRatio, calmarRatioAndGainPainRatio])]
+    
+    table = dbc.Table(table_header + table_body, bordered=False, className = "white_table", style={"height": "351px", "fontSize": "1.4em"})
+    
+    return table
+
+def getEurodollarTabContent():
+    
+    layout = {
+            "template": "plotly_dark",
+            "xaxis_rangeslider_visible": False,
+            "margin": {"r": 10, "t": 10, "l": 25, "b": 25},
+            "legend": {"x": 0.45, "y": 1.05, "orientation": "h"}
+        }
+        
+    layout_fig = go.Figure(layout=layout)
+    
+    fig = make_subplots(rows=1, cols=1, row_heights = [1.0], figure = layout_fig,
+                        # subplot_titles=subplot_titles,
+                        vertical_spacing=0.05)
+    
+    fig.update_yaxes({
+                "title": {"standoff": 25},
+                "tickformat": ".2f",
+                "side": "right",
+                "tickprefix": "      ",
+                "ticksuffix": "%"
+            }, row=1, col=1)
+    
+    palette = cycle(px.colors.qualitative.D3)
+    
+    df = eurodollarCurveDf.loc[: '2027-1-1']
+    
+    fig.add_trace(go.Scatter(x=df.index.values, y=df["today"],
+        mode='lines',
+        line=dict(width=2, color = next(palette), shape="spline"),
+        showlegend = True,
+        name="Today"), row=1, col=1)
+    
+    fig.add_trace(go.Scatter(x=df.index.values, y=df["1D"],
+        mode='lines',
+        line=dict(width=2, color = next(palette), shape="spline"),
+        showlegend = True,
+        name="1D"), row=1, col=1)
+    
+    fig.add_trace(go.Scatter(x=df.index.values, y=df["1W"],
+        mode='lines',
+        line=dict(width=2, color = next(palette), shape="spline"),
+        showlegend = True,
+        name="1W"), row=1, col=1)
+    
+    fig.add_trace(go.Scatter(x=df.index.values, y=df["1M"],
+        mode='lines',
+        line=dict(width=2, color = next(palette), shape="spline"),
+        showlegend = True,
+        name="1M"), row=1, col=1)
+    
+    fig.update_layout(height=1080)
+    
+    chart = dcc.Graph(figure=fig)
+    
+    content = dbc.Container(
+        fluid=True,
+        className="px-0",
+        children=[dbc.Row(
+        [
+            dbc.Col(chart,
+            xs=12,
+            className="dbc_dark"
+            )
+            ]
+        )])
+    
+    
+    return content
+
+    
+    layout = {
+            "template": "plotly_dark",
+            "xaxis_rangeslider_visible": False,
+            "margin": {"r": 10, "t": 10, "l": 25, "b": 25},
+            "legend": {"x": 0.45, "y": 1.05, "orientation": "h"}
+        }
+        
+    layout_fig = go.Figure(layout=layout)
+    
+    fig = make_subplots(rows=1, cols=1, row_heights = [1.0], figure = layout_fig,
+                        # subplot_titles=subplot_titles,
+                        vertical_spacing=0.05)
+    
+    fig.update_yaxes({
+                "title": {"standoff": 25},
+                "tickformat": ".2f",
+                "side": "right",
+                "tickprefix": "      $"
+            }, row=1, col=1)
+    
+    palette = cycle(px.colors.qualitative.D3)
+    
+    df = oilCurveDf.loc[: '2027-1-1']
+    
+    fig.add_trace(go.Scatter(x=df.index.values, y=df["today"],
+        mode='lines',
+        line=dict(width=2, color = next(palette), shape="spline"),
+        showlegend = True,
+        name="Today"), row=1, col=1)
+    
+    fig.add_trace(go.Scatter(x=df.index.values, y=df["1D"],
+        mode='lines',
+        line=dict(width=2, color = next(palette), shape="spline"),
+        showlegend = True,
+        name="1D"), row=1, col=1)
+    
+    fig.add_trace(go.Scatter(x=df.index.values, y=df["1W"],
+        mode='lines',
+        line=dict(width=2, color = next(palette), shape="spline"),
+        showlegend = True,
+        name="1W"), row=1, col=1)
+    
+    fig.add_trace(go.Scatter(x=df.index.values, y=df["1M"],
+        mode='lines',
+        line=dict(width=2, color = next(palette), shape="spline"),
+        showlegend = True,
+        name="1M"), row=1, col=1)
+    
+    fig.update_layout(height=1080)
+    
+    chart = dcc.Graph(figure=fig)
+    
+    content = dbc.Container(
+        fluid=True,
+        className="px-0",
+        children=[dbc.Row(
+        [
+            dbc.Col(chart,
+            xs=12,
+            className="dbc_dark"
+            )
+            ]
+        )])
+    
+    
+    return content
+
+def getPerformanceTabContent():
+    lookback = 10
+    
+    content = dbc.Container(
+        fluid=True,
+        className="px-0",
+        children=[dbc.Row(
+        [
+            dbc.Col([
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            getPerformanceStatsTable(),
+                            xs=6,
+                            className="dbc_dark"
+                        ),
+                        dbc.Col(
+                            html.Div(getPerformanceChartTable("AllTimePerformance", "Performance", "bg-success", 100.0, True)),
+                            xs=6,
+                            className="dbc_dark"
+                        )]
+                ),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            html.Div(getPerformanceChartTable("SharpeRatio", "Sharpe Ratio", "bg-warning", lookback=lookback)),
+                            xs=6,
+                            className="dbc_dark"
+                        ),
+                        dbc.Col(
+                            html.Div(getPerformanceChartTable("SortinoRatio", "Sortino Ratio", "bg-danger", lookback=lookback)),
+                            xs=6,
+                            className="dbc_dark"
+                        )]
+                ),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            html.Div(getPerformanceChartTable("CalmarRatio", "Calmar Ratio", "bg-info", lookback=lookback)),
+                            xs=6,
+                            className="dbc_dark"
+                        ),
+                        dbc.Col(
+                            html.Div(getPerformanceChartTable("GainPainRatio", "Gain/Pain Ratio", "bg-light", lookback=lookback)),
+                            xs=6,
+                            className="dbc_dark"
+                        )]
+                )
+            ],
+                xs=12
+            )],
+        className="dbc_dark"
+    )])
+    
+    return content
+
 app.layout = html.Div(
     [
      dcc.Store(id="asset_modal_store", data = {"collection": "", "active_ticker": ""}),
@@ -1573,10 +1935,19 @@ app.layout = html.Div(
                      className="dbc_dark"
                  ),
                      dbc.Col(
-                         [dbc.Alert("Click the table", id='out', className="pb-3", is_open = False),
-                          getAssetsDataTableWrapper("portfolio", portfolio, "bg-success"),
-                          getAssetsDataTableWrapper("watchlist", watchlist, "bg-danger")
-                          ],
+                         dbc.Tabs(
+                             [
+                                 dbc.Tab([dbc.Alert("Click the table", id='out', className="pb-3", is_open = False),
+                                      getAssetsDataTableWrapper("portfolio", portfolio, "bg-success"),
+                                      getAssetsDataTableWrapper("watchlist", watchlist, "bg-danger")
+                                      ], tab_id="portfolio_tab", label="Portfolio"),
+                                 dbc.Tab(getPerformanceTabContent(), tab_id="performance_tab", label="Performance"),
+                                 dbc.Tab(getEurodollarTabContent(), tab_id="eurodollar_tab", label="Eurodollar Curve"),
+                                 dbc.Tab("The Macro Chart", tab_id="the_macro_chart", label="The Macro Chart"),
+                                 ],
+                             active_tab="portfolio_tab"
+                         
+                         ),
                      xs=9,
                      id="main_content"
                  )],

@@ -9,6 +9,7 @@ import pandas as pd
 import math
 from operator import add 
 from finta import TA
+from datetime import datetime
 
 def calcHv(data, window):
     log_returns = np.log(data['close'] / data['close'].shift())
@@ -125,6 +126,18 @@ def BridgeBands(d, src, n):
     
     return BridgeBandBottom, BridgeBandTop
 
+def to_datetime(date):
+    """
+    Converts a numpy datetime64 object to a python datetime object 
+    Input:
+      date - a np.datetime64 object
+    Output:
+      DATE - a python datetime object
+    """
+    timestamp = ((date - np.datetime64('1970-01-01T00:00:00'))
+                 / np.timedelta64(1, 's'))
+    return datetime.utcfromtimestamp(timestamp)
+
 def calcVolumeMetrics(data):
     data["Volume1W"] = data["volume"].rolling(5).mean()
     data["Volume1M"] = data["volume"].rolling(21).mean()
@@ -137,12 +150,27 @@ def calcVolumeMetrics(data):
     weekVolume = 0.0
     monthVolume = 0.0
     
+    # newIndex = []
+    # for d in data.index.values:
+    #     newIndex.append(to_datetime(d))
+    
+    # data.set_index(newIndex, inplace=True)
+    
+    # print(data.index.values[:5])
+    
     for idx in data.index.values:
         if previousIndex is None:
             data.at[idx, "VolumeEnum"] = 0.0
             previousIndex = idx
         else:
             volumeEnum = 0.0
+            
+            
+            # ts = pd.to_datetime(str(idx)) 
+            # d = ts.strftime('%Y.%m.%d')
+            
+            
+            # print(data.loc[idx, "volume"], idx, type(idx), data.index.dtype)
             
             todayVolume = data.at[idx, "volume"]
             ydayVolume = data.at[previousIndex, "volume"]

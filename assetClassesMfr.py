@@ -20,8 +20,10 @@ import math
 tickerLookup = {
     "VIX": { "tda": "$VIX.X", "mfr": "^VIX" },
     "DXY": { "tda": "$DXY.X", "mfr": "^DXY", "yahoo": "DX-Y.NYB" },
+    "MOVE": { "tda": "$MOVE.X", "mfr": "^MOVE", "yahoo": "^MOVE" },
     "US10Y": { "tda": "$TNX.X", "mfr": "^US10Y", "divisor": 10.0, "isPercent": True },
-    "US30Y": { "tda": "$TYX.X", "mfr": "^US30Y", "divisor": 10.0, "isPercent": True }
+    "US30Y": { "tda": "$TYX.X", "mfr": "^US30Y", "divisor": 10.0, "isPercent": True },
+    "RFR": { "tda": "$IRX.X", "mfr": "^IRX", "divisor": 10.0, "isPercent": True }
     }
 
 correlationTickers = ["DXY", "SPY", "US10Y", "US30Y", "VIX"]
@@ -156,7 +158,7 @@ def getMfrChangeListGroupItemsForTicker(ticker, amc):
     return list_group_items
 
 class Asset:
-    def __init__(self, ticker, quantity = 0.0, entry = 0.0, corrTicker = "", j = None, stop = 0.0, target = 0.0):
+    def __init__(self, ticker, quantity = 0.0, entry = 0.0, corrTicker = "", j = None, stop = 0.0, target = 0.0, vaR = 0.0):
         if j is None:
             self.id = ticker
             self.ticker = ticker
@@ -174,6 +176,7 @@ class Asset:
             self.cost_basis = self.quantity * self.entry
             self.Stop = stop
             self.Target = target
+            self.VaR = vaR
 
             self.Stop_Ratio = 0.0
             self.Target_Ratio = 0.0
@@ -204,6 +207,7 @@ class Asset:
             #Calculated Properties
             self.Weight = 0.0
             self.PnL = 0.0
+            self.PortPnL = 0.0
             self.CATS = 0.0
             
             self.IV_Premium = np.nan
@@ -221,7 +225,7 @@ class Asset:
     def df_row(self):
         return [self.id, self.ticker, self.quantity, self.entry, self.last, self.Chg1D, self.Chg1M, self.Chg3M,
                 self.Momentum, self.MomentumEmoji, self.Trend, self.TrendEmoji, self.LR, self.TR, self.RPos, self.VolumeDesc,
-                self.MfrAction, self.CATS, self.Crowding_Text, self.Stop, self.Target] 
+                self.MfrAction, self.CATS, self.Crowding_Text, self.Stop, self.Target, self.VaR, self.PortPnL] 
        
     def toJson(self):
         d = self.__dict__.copy()
@@ -243,6 +247,9 @@ class Asset:
             self.Target_Ratio = (self.last - self.entry) / (self.Target - self.entry)
     
         #%% Chg
+        if self.ticker == "RFR":
+            self.price_data.loc[(self.price_data['close'] < 0.0), 'close'] = 0.0001
+        
         self.price_data['Chg1D'] = np.log(self.price_data['close'] / self.price_data['close'].shift())
         self.Chg1D = self.price_data.at[self.price_data.index[-1], "Chg1D"]
         
@@ -363,25 +370,49 @@ class Asset:
             self.price_data["skew_zscore"] = self.price_data["skew_zscore"].shift(1)
             self.price_data["crowding_score"] = self.price_data["iv_premium"] * self.price_data["skew_zscore"] * 100.0
             
+            # self.price_data["Trend"]
+            # if x == "bullish":
+            #     emoji = '✔️'
+            # elif x == "bearish":
+            #     emoji = '❌'
+            # elif x == "neutral":
+            #     emoji = '⚠️'
+            # elif x == "neutralDanger":
+            #     emoji = '🎽'
+            
+            
+            # Get Short
+            # Get Long
+            
             #squeeze
             self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_color'] = '#00441B'
             self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_text_color'] = 'white'
             self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_text'] = 'Squeeze'
             
             #trim longs
-            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_color'] = '#73C476'
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_color'] = '#FCBCA2'
             self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_text_color'] = '#272727'
             self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] > 0.0), 'crowding_text'] = 'Trim Longs'
             
-            #correction
+            #get short
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] > 0.0) & (self.price_data["Trend"] == "bearish"), 'crowding_color'] = '#CB181D'
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] > 0.0) & (self.price_data["Trend"] == "bearish"), 'crowding_text_color'] = 'white'
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] > 0.0) & (self.price_data["Trend"] == "bearish"), 'crowding_text'] = 'Get Short'
+            
+            #puke
             self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_color'] = '#67000D'
             self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_text_color'] = 'white'
-            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_text'] = 'Correction'
+            self.price_data.loc[(self.price_data['skew_zscore'] < 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_text'] = 'Puke'
             
             #trim shorts
-            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_color'] = '#FB6B4B'
+            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_color'] = '#C7E9C0'
             self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_text_color'] = '#272727'
             self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] < 0.0), 'crowding_text'] = 'Trim Shorts'
+                     
+            #get long
+            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] < 0.0) & (self.price_data["Trend"] == "bullish"), 'crowding_color'] = '#228A44'
+            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] < 0.0) & (self.price_data["Trend"] == "bullish"), 'crowding_text_color'] = 'white'
+            self.price_data.loc[(self.price_data['skew_zscore'] > 0.0) & (self.price_data["iv_premium"] < 0.0) & (self.price_data["Trend"] == "bullish"), 'crowding_text'] = 'Get Long'
             
             self.IV_Premium = self.procureLastValue("iv_premium")
             self.IV_Skew = self.procureLastValue("skew_zscore")
@@ -536,6 +567,7 @@ class Asset:
         if isPortfolio:
             self.Weight = collectionDf.at[self.ticker, "Weight"]
             self.PnL = collectionDf.at[self.ticker, "PnL"]
+            self.PortPnL = collectionDf.at[self.ticker, "PortPnL"]
         
         self.last = collectionDf.at[self.ticker, "Last"]
         self.MfrAction = collectionDf.at[self.ticker, "MfrAction"]     
@@ -555,7 +587,10 @@ class Asset:
     
         for i in r:
             if abs(i) < len_original_closes:
-                new_closes.insert(0, original_closes[i])
+                if not np.isnan(original_closes[i]):
+                    new_closes.insert(0, original_closes[i])
+                else:
+                    print("NaN in position calculation")
             else:
                 print(f"{self.ticker} not enough data")
                 break
@@ -615,14 +650,30 @@ class AssetCollection:
         self.isPortfolio = isPortfolio
 
         if csvFileName is not None:
-            temp = pd.read_csv(os.path.join(os.getcwd(), 'portfolios', csvFileName), index_col="Ticker") 
             
-            hasExits = "Stop" in temp.columns
+            if csvFileName == "Benchmarks.txt":
+                with open('portfolios/Benchmarks.txt') as f:
+                    data = f.read()
+
+                benchmarksDict = json.loads(data)
+                
+                self.collection["Cash"] = Asset("Cash", 1, 1.0)
+                
+                for benchmark in benchmarksDict:
+                    for ticker in benchmarksDict[benchmark]["Tickers"]:
+                        if ticker not in self.collection:
+                            self.collection[ticker] = Asset(ticker, 1, 1.0)
             
-            for ticker in temp.index.values:
-                self.collection[ticker] = Asset(ticker, temp.at[ticker, 'Quantity'], temp.at[ticker, 'Entry'],
-                                                stop = temp.at[ticker, 'Stop'] if hasExits else 0.0,
-                                                target = temp.at[ticker, 'Target'] if hasExits else 0.0)
+            else:
+                temp = pd.read_csv(os.path.join(os.getcwd(), 'portfolios', csvFileName), index_col="Ticker") 
+                
+                hasExits = "Stop" in temp.columns
+                
+                for ticker in temp.index.values:
+                    self.collection[ticker] = Asset(ticker, temp.at[ticker, 'Quantity'], temp.at[ticker, 'Entry'],
+                                                    stop = temp.at[ticker, 'Stop'] if hasExits else 0.0,
+                                                    target = temp.at[ticker, 'Target'] if hasExits else 0.0,
+                                                    vaR = temp.at[ticker, 'VaR'] if ("VaR" in temp.columns) else 0.0)
                 
             self.collection["Cash"].last = self.collection["Cash"].entry
         else:
@@ -631,22 +682,30 @@ class AssetCollection:
                 
         self.df = pd.DataFrame(columns = ["id", "Ticker", "Quantity", "Entry", "Last", "Chg1D", "Chg1M", "Chg3M", "Momentum", "MomentumEmoji",
                                           "Trend", "TrendEmoji", "LR", "TR", "RPos", "VolumeDesc", "MfrAction", "CATS", "Crowding_Text",
-                                          "Stop", "Target"])
+                                          "Stop", "Target", "VaR", "PortPnl"])
         
         self.df.loc["Cash"] = self.collection["Cash"].df_row
         
         allTickers = [ticker for ticker in self.collection]
         allTickers.remove("Cash")
+        
+        if "Footer" in allTickers:
+            allTickers.remove("Footer")
+        
         price_data, vol_data = dr.GetDataFromCsv(allTickers, True)
         range_data = getRangeData(generic_ranges)
         
         for ticker in allTickers:
-            if ticker != "Cash":
+            if ((ticker != "Cash") and (ticker != "Footer")):
                 if not self.collection[ticker].data_and_technicals_set:
                     self.collection[ticker].setDataAndTechnicals(price_data[ticker], range_data, vol_data[ticker], generic_ranges)
                 
                 self.df.loc[ticker] = self.collection[ticker].df_row
              
+        
+        # if isPortfolio:
+        #     self.collection["Footer"] = Asset("Footer", 1.0, 1.0)
+        #     self.df.loc["Footer"] = self.collection["Footer"].df_row
         
         self.df["Cost Basis"] = self.df["Quantity"] * self.df["Entry"]
         self.df["Current Value"] = self.df["Quantity"] * self.df["Last"]
@@ -657,18 +716,22 @@ class AssetCollection:
             self.portfolio_value = self.df["Current Value"].sum()
             self.df["Weight"] = self.df["Current Value"] / self.portfolio_value
             self.df["PnL"] = ((self.df["Last"] - self.df["Entry"]) / self.df["Entry"])
+            self.df["PortPnL"] = (self.df["Current Value"] - self.df["Cost Basis"]) / self.portfolio_value
+            
+            # self.df.at["Footer", "VaR"] = self.df["VaR"].sum()
+            # self.df.at["Footer", "PortPnL"] = self.df["PortPnL"].sum()
         else:
             self.df["Weight"] = 0.0
             self.df["PnL"] = 0.0
-        
-        # print(self.df.head())
-        
+            self.df["PortPnL"] = 0.0
         
         
         for ticker in self.collection:
             self.collection[ticker].setCalculatedProperties(self.df, self.isPortfolio)
             
-                
+          
+        
+          
     def toDict(self):
         temp = {}
         
