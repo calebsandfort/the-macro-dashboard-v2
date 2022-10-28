@@ -42,6 +42,160 @@ def getAccessToken():
 #endDate = datetime.datetime.strptime('2021-09-21', '%Y-%m-%d')
 #"https://api.tdameritrade.com/v1/marketdata/chains?apikey=CGO9BSW7QI4SAOTB2RP9AUCY8QFFMQ47&symbol=XLP&contractType=PUT&strikeCount=20&strategy=SINGLE"
 
+def GetFredDataForTickers(tickers, startDate, endDate, saveToFile = False):
+    data = {}
+    
+    for ticker in tickers:
+        data[ticker] = GetFredData(ticker, startDate, endDate, saveToFile)
+        
+    return data
+
+def GetFredData(ticker, startDate, endDate, saveToFile = False):
+    original_df = None
+    df = None
+    
+    fredTickerLookup = {
+        "RRP": "RRPONTSYD",
+        "FED": "WALCL",
+        "TGA": "WDTGAL",
+        "T10Y3M": "T10Y3M",
+        "MORTGAGE30US": "MORTGAGE30US",
+        "AAA_CREDIT": "BAMLC0A1CAAA",
+        "BBB_CREDIT": "BAMLC0A4CBBB",
+        "JUNK_CREDIT": "BAMLH0A0HYM2",
+        }
+    
+    fredTicker = fredTickerLookup[ticker]
+    
+    multiplierLookup = {
+        "RRP": 1000000000,        
+        "FED": 1000000,        
+        "TGA": 1000000,        
+        "T10Y3M": 1,        
+        "MORTGAGE30US": 1,
+        "AAA_CREDIT": 1,
+        "BBB_CREDIT": 1,
+        "JUNK_CREDIT": 1,
+        }
+    
+    multiplier = multiplierLookup[ticker]
+    
+    file_path = "data/{0}.csv".format(ticker);
+    
+    file_exists = exists(file_path)
+    
+    if file_exists:
+        original_df = pd.read_csv(file_path, index_col="date", parse_dates=True)
+        startDate = pd.to_datetime(original_df.index.values[-1])
+
+    isCurrent = startDate.date() == endDate.date()
+
+    endpoint = 'https://api.stlouisfed.org/fred/series/observations?api_key={apiKey}&series_id={ticker}&file_type=json&observation_start={startDate}&observation_end={endDate}'
+    
+    full_url = endpoint.format(apiKey = apiKeys.fred_api_key, ticker=fredTicker, startDate=startDate.strftime("%Y-%m-%d"), endDate=endDate.strftime("%Y-%m-%d"))
+    
+    page = requests.get(url=full_url)
+
+    content = json.loads(page.content)
+
+    df = pd.DataFrame.from_dict(content["observations"])
+    df.set_index(df['date'].astype('datetime64'), inplace=True)
+    df.drop(['date', 'realtime_start', 'realtime_end'], inplace=True, axis = 1)
+    
+    df["value"] = df["value"].apply(lambda x: np.NaN if str(x) == "." else x)
+    df.fillna(method="ffill", inplace=True)
+    df['value'] = pd.to_numeric(df['value'],errors = 'coerce')
+
+    df["value"] = df["value"] * multiplier
+    
+    if original_df is not None and isCurrent:
+        lastIndex = original_df.index.values[-1]
+
+        original_df.at[lastIndex, 'value'] = df.at[lastIndex, 'value']
+        
+        df = original_df.copy()
+    elif original_df is not None:
+        additional_rows = df.loc[df.index.isin(original_df.index.values[-1:])] if isCurrent else df.loc[~df.index.isin(original_df.index.values)]
+        df = pd.concat([original_df, additional_rows])
+    
+    df = df.round({"value": 2})
+    
+    if saveToFile and df is not None:
+        df.to_csv(file_path)
+        print("Saved {0}.csv".format(ticker))
+    
+    return df
+
+def GetTreasuryData(ticker, startDate, endDate, saveToFile = False):
+    original_df = None
+    df = None
+
+    multiplierLookup = {     
+        "TGA": 1000000
+        }
+    
+    multiplier = multiplierLookup[ticker]
+    
+    file_path = "data/{0}.csv".format(ticker);
+    
+    file_exists = exists(file_path)
+    
+    if file_exists:
+        original_df = pd.read_csv(file_path, index_col="date", parse_dates=True)
+        startDate = pd.to_datetime(original_df.index.values[-1])
+
+    isCurrent = startDate.date() == endDate.date()
+
+    # endpoint = 'https://api.stlouisfed.org/fred/series/observations?api_key={apiKey}&series_id={ticker}&file_type=json&observation_start={startDate}&observation_end={endDate}'
+    
+    # full_url = endpoint.format(apiKey = apiKeys.fred_api_key, ticker=ticker, startDate=startDate.strftime("%Y-%m-%d"), endDate=endDate.strftime("%Y-%m-%d"))
+    
+    full_url = "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dts/dts_table_1?fields=record_date, open_today_bal&page[size]=1000&filter=record_date:gt:2022-09-01,account_type:in:(Treasury General Account (TGA) Closing Balance)"
+    
+    page = requests.get(url=full_url)
+
+    content = json.loads(page.content)
+
+    df = pd.DataFrame.from_dict(content["data"])
+    df['date'] = df['record_date'].astype('datetime64')
+    df.set_index(df['date'], inplace=True)
+    
+    df["value"] = df["open_today_bal"].apply(lambda x: np.NaN if str(x) == "." else x)
+    
+    df.drop(['record_date', 'date', 'open_today_bal'], inplace=True, axis = 1)
+    
+    df.fillna(method="ffill", inplace=True)
+    df['value'] = pd.to_numeric(df['value'],errors = 'coerce')
+    
+    
+    # print(df.info())
+    
+    df["value"] = df["value"] * multiplier
+    
+    if original_df is not None and isCurrent:
+        lastIndex = original_df.index.values[-1]
+
+        original_df.at[lastIndex, 'value'] = df.at[lastIndex, 'value']
+        
+        df = original_df.copy()
+    elif original_df is not None:
+        additional_rows = df.loc[df.index.isin(original_df.index.values[-1:])] if isCurrent else df.loc[~df.index.isin(original_df.index.values)]
+        df = pd.concat([original_df, additional_rows])
+    
+    df = df.round({"value": 2})
+    
+    if saveToFile and df is not None:
+        df.to_csv(file_path)
+        print("Saved {0}.csv".format(ticker))
+    
+    return df
+
+# startDatey = datetime.datetime.strptime('2019-05-01', '%Y-%m-%d')
+# endDatey = datetime.datetime.today()
+
+# test = GetTreasuryData("TGA", startDatey, endDatey, True)
+# test = GetFredDataForTickers(["FED", "RRP"], startDatey, endDatey, True)
+
 def GetTdaDataForTickers(tickers, periodType, frequencyType, frequency, startDate, endDate, needExtendedHoursData, saveToFile = False):
     accessToken = getAccessToken()
     

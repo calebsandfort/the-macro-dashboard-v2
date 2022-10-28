@@ -23,7 +23,9 @@ tickerLookup = {
     "MOVE": { "tda": "$MOVE.X", "mfr": "^MOVE", "yahoo": "^MOVE" },
     "US10Y": { "tda": "$TNX.X", "mfr": "^US10Y", "divisor": 10.0, "isPercent": True },
     "US30Y": { "tda": "$TYX.X", "mfr": "^US30Y", "divisor": 10.0, "isPercent": True },
-    "RFR": { "tda": "$IRX.X", "mfr": "^IRX", "divisor": 10.0, "isPercent": True }
+    "RFR": { "tda": "$IRX.X", "mfr": "^IRX", "divisor": 10.0, "isPercent": True },
+    "BTC": { "tda": "$BTC", "mfr": "BTC", "yahoo": "BTC-USD" },
+    "ES": { "tda": "ES", "mfr": "ES", "yahoo": "ES=F" }
     }
 
 correlationTickers = ["DXY", "SPY", "US10Y", "US30Y", "VIX"]
