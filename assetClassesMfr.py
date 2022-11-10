@@ -25,7 +25,8 @@ tickerLookup = {
     "US30Y": { "tda": "$TYX.X", "mfr": "^US30Y", "divisor": 10.0, "isPercent": True },
     "RFR": { "tda": "$IRX.X", "mfr": "^IRX", "divisor": 10.0, "isPercent": True },
     "BTC": { "tda": "$BTC", "mfr": "BTC", "yahoo": "BTC-USD" },
-    "ES": { "tda": "ES", "mfr": "ES", "yahoo": "ES=F" }
+    "ES": { "tda": "ES", "mfr": "ES", "yahoo": "ES=F" },
+    "SPX": { "tda": "$SPX", "mfr": "SPX", "yahoo": "^SPX" }
     }
 
 correlationTickers = ["DXY", "SPY", "US10Y", "US30Y", "VIX"]
@@ -747,14 +748,18 @@ def getSentimentEmoji(x):
     # '✔️' if x == "bullish" elif x == "bearish" elif x == "bearish" else '⚠️' else ''
     emoji = ''
     
-    if x == "bullish":
+    if (x == "bullish" or x == "Positive"):
         emoji = '✔️'
-    elif x == "bearish":
+    elif (x == "bearish" or x == "Negative"):
         emoji = '❌'
     elif x == "neutral":
         emoji = '⚠️'
     elif x == "neutralDanger":
         emoji = '🎽'
+    elif x == "Consolidation":
+        emoji = '🥱'
+    elif x == "Volatile":
+        emoji = '🤬'
     
     return emoji
 

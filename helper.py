@@ -49,7 +49,7 @@ def refreshData():
 
 
 # refreshData()
-portfolio = ac.AssetCollection("Portfolio.csv")
+# portfolio = ac.AssetCollection("Portfolio.csv")
 
 # t = 5
 

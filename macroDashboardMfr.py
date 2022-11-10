@@ -38,6 +38,9 @@ parser.add_argument("-g", "--generic_ranges", help="generic ranges",
                     action="store_true")
 
 args = parser.parse_args()
+
+print(args.generic_ranges)
+
 if args.refresh:
     helper.refreshData()
 

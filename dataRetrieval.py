@@ -29,6 +29,7 @@ def getAccessToken():
     x = requests.post(url, data = params)
 
     content = json.loads(x.text)
+
     tda_access_token = content['access_token']
 
     return tda_access_token

@@ -16,7 +16,7 @@ def getTheMostImportantData(refreshData = False):
     
     startDate = datetime.datetime.strptime('2019-05-01', '%Y-%m-%d')
     endDate = datetime.datetime.today()
-    spliceIndex = "2021-01-01"
+    spliceIndex = "2021-12-20"
     
     tga = dr.GetTreasuryData("TGA", startDate, endDate, refreshData)
     tga = tga[spliceIndex:]
@@ -33,7 +33,7 @@ def getTheMostImportantData(refreshData = False):
     es = rawData["ES"]
     btc = rawData["BTC"]
     
-    masterIndex = tga.index.values
+    masterIndex = rrp.index.values
     fedIndex = fed.index.values
     rrpIndex = rrp.index.values
     esIndex = es.index.values
@@ -52,7 +52,8 @@ def getTheMostImportantData(refreshData = False):
         if (idx not in btcIndex):
             btc.at[idx, "close"] = np.NaN
     
-    
+    tga.sort_index(inplace=True)
+    tga.fillna(method="ffill", inplace=True)
     
     fed.sort_index(inplace=True)
     fed.fillna(method="ffill", inplace=True)
@@ -72,12 +73,20 @@ def getTheMostImportantData(refreshData = False):
     
     data = pd.DataFrame(index = masterIndex)
     data.index.name='date'
-    data["netLiquidity"] = fed["value"] - tga["value"] - rrp["value"]
-
+    data["fed"] = fed["value"]
+    data["fed"].fillna(method="ffill", inplace=True)
+    data["tga"] = tga["value"]
+    data["tga"].fillna(method="ffill", inplace=True)
+    data["tga"] = data["tga"].shift()
+    data["tga"].fillna(method="bfill", inplace=True)
+    data["rrp"] = rrp["value"]
+    data["rrp"].fillna(method="ffill", inplace=True)
+    data["netLiquidity"] = fed["value"] - data["tga"] - rrp["value"]
+    data["netLiquidity"].fillna(method="bfill", inplace=True)
     
-    data.to_csv("C:/Users/csandfort/Source/Repos/TradingViewIndicatorGenerator/TradingViewIndicatorGenerator/CSVs/NetLiquidity/netLiquidity.csv")
+    data[spliceIndex:].to_csv("C:/Users/csandfort/Source/Repos/TradingViewIndicatorGenerator/TradingViewIndicatorGenerator/CSVs/NetLiquidity/netLiquidity.csv")
 
     return data
     
     
-test = getTheMostImportantData(False)
+test = getTheMostImportantData(True)
