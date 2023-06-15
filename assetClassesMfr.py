@@ -26,7 +26,7 @@ tickerLookup = {
     "RFR": { "tda": "$IRX.X", "mfr": "^IRX", "divisor": 10.0, "isPercent": True },
     "BTC": { "tda": "$BTC", "mfr": "BTC", "yahoo": "BTC-USD" },
     "ES": { "tda": "ES", "mfr": "ES", "yahoo": "ES=F" },
-    "SPX": { "tda": "$SPX", "mfr": "SPX", "yahoo": "^SPX" }
+    "SPX": { "tda": "$SPX.X", "mfr": "SPX" }
     }
 
 correlationTickers = ["DXY", "SPY", "US10Y", "US30Y", "VIX"]

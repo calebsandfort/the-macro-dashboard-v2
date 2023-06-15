@@ -1477,15 +1477,16 @@ def getCorrelationContent(asset):
     return correlation_stats_table
 
 def getCorrelation(asset1, asset2, length):
-    x = asset1.price_data['Chg1D'].values[-length:]
-    y = asset2.price_data['Chg1D'].values[-length:]
+    return 1.0
+    # x = asset1.price_data['Chg1D'].values[-length:]
+    # y = asset2.price_data['Chg1D'].values[-length:]
     
-    if x.size != y.size:
-        return np.nan
+    # if x.size != y.size:
+    #     return np.nan
     
-    correlation, p_value = pearsonr(x, y)
+    # correlation, p_value = pearsonr(x, y)
     
-    return correlation
+    # return correlation
 
 def getCorrelationChart(asset):
     df = asset.price_data.iloc[-63:].copy()

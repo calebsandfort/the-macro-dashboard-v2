@@ -16,7 +16,7 @@ you can always open an account and not fund it. Or adapt the code to your prefer
 2. Read https://developer.tdameritrade.com/content/getting-started to familiarize yourself with TD Ameritrade API
 3. Register an app. Set callback URL to "https://127.0.0.1"
     a. Make note of your Consumer Key on the Keys tab for the app
-4. Replace consumer key in this url and hit it in a browser: https://auth.tdameritrade.com/auth?response_type=code&redirect_uri=https%3A%2F%2F127.0.0.1&client_id=<Consumer Key>%40AMER.OAUTHAP
+4. Replace consumer key in this url and hit it in a browser: https://auth.tdameritrade.com/auth?response_type=code&redirect_uri=https%3A%2F%2Flocalhost&client_id=<Consumer Key>%40AMER.OAUTHAP
 5. You will get a url in the browser address bar like this: https://127.0.0.1/?code=i03mYbZrlxm%2BxPErooovCOA%2FKwot5fIQd8If5GpVaWKZ5wUkcbr%2FAQMobltg749SI5lguD3qBrOgZJbFv2lXDsmCDSiYATBPwdHCWCfVd2RiOJAcG0nVwgY6X%2BWkLSE%2B4%2FII06nSMmfCYxB1jj3P3u4M2Bzgs%2FG4J2C2knQoiOJ98wPhafUwBVkGG1yzk3cqTyCk%2Bn%2B%2Fe1OLP3VPenpojqOu%2FyZqdar9qLgLcfuA6%2Bp1uFwnigaKMMhCdsKNrFuWbBgWyury3GkR8I%2FkaApLMHJJLTKtJFQGMhAlL0vPYtZLsMEVfNHmAw1MFGFHxs8orC8sxN06%2F39jBr3crfjiKyyxrK4i7nhoxAifCRZzbT337br3RoztiMYd9BENTrUpB%2B3e7LK9qpSIMWPa%2FgklVCzmILBvZ243%2FClBOxX4FNu1n1YppLteVaiUalp100MQuG4LYrgoVi%2FJHHvlS%2BrcXeemIibX1B9liCtwHTYAIuk72flyvmmnAa%2FOdiY98DmMyYm8KT2DPFPrTAbq%2BSPaaefWb4iYkPSOSrdzoW%2BKn7j%2FuRJfTyhkNSay4hG8jrQon%2B4ZJxSeH1Rlbiapl63XW4h7cGnik7ZMjeV0pLUGCWGhtV%2FsHkntEr1707iWmaCQ87%2BzGxvGXL%2FzxcatIJzjMQNQeiTLASf7tRxGy60PLiQFpp5K8v%2FGyQ1wEf8BqVfBjapxTY3CJTpfVbPUcIbjey2TubkaLjK6MG6qMeaf2zdC0WJcP33tsDUnc%2FK%2BKUOmh%2FSOMDWKTLqD00D48jEc5v4lscnNLJKH60SXOgQDSV%2Fanqzt5g%2BN0DuldzOM3OuvuH2P4AJvT0OIUZesffxtXpEDFnsaYqr7JcPosHeG6aVsTj8%2FpH0FyeZQ7p5zyC8yS%2BPW8jQHgg8%3D212FD3x19z9sWBHDJACbC00B75E
 6. Copy everything after code=
 7. Go to https://www.urldecoder.org/ and decode the text
@@ -57,3 +57,6 @@ Useful links
 - https://plotly.com/python/
 - https://www.anaconda.com/
 - https://dash.plotly.com/
+
+
+1W2ETS0ETWQBSTRLIARCBLZJACHJYICG

@@ -36,7 +36,7 @@ original_index_values = original_df.index.values
 original_closes = original_df["close"].values
 
 
-r = list(range(-1, (-20 * 36) - 1, -20))
+r = list(range(-1, (-20 * 9) - 1, -20))
 
 new_index_values = []
 new_closes = []
@@ -55,7 +55,7 @@ monthly_vol = variance ** 0.5
 
 close = original_closes[-1]
 
-portfolio_value = 180000
+portfolio_value = 170000
 stop_loss_sigma = 1.5
 stop_loss_offset = close * stop_loss_sigma * monthly_vol
 stop_loss_percent = args.max_loss / 100.0
@@ -91,7 +91,9 @@ print()
 
 if args.direction == "long":
     print(f"Long Stop: ${long_stop_loss_value:,.2f}")
+    print(f"Long Stop Offset: ${stop_loss_offset:,.2f}")
     print(f"Long Target: ${long_profit_target_value:,.2f}")
+    print(f"Long Target Offset: ${profit_target_offset:,.2f}")
 
 if args.direction == "short":
     print(f"Short Stop: ${short_stop_loss_value:,.2f}")
